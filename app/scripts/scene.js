@@ -1,5 +1,5 @@
 /*global define, THREE, $*/
-define(['jquery', 'three', 'libs/singleton', 'renderloop', 'libs/pointerInteractions'], function ($, three, AnimRequest, renderloop, PointerInteractions) {
+define(['jquery', 'three', 'libs/requestAnimSingleton', 'renderloop', 'libs/pointerInteractions'], function ($, three, AnimRequest, renderloop, PointerInteractions) {
     'use strict';
 
     var requestAnimFrame = (function(){
@@ -74,9 +74,10 @@ define(['jquery', 'three', 'libs/singleton', 'renderloop', 'libs/pointerInteract
         for (var i=0; i<10; i++) {
             c[i] = [];
             for (var j=0; j<10; j++) {
-                var material = new THREE.MeshLambertMaterial({color: 0xCC00CC});
-                c[i][j] = new THREE.Mesh(new THREE.CubeGeometry(100, 100, 100), material);
+                var material = new THREE.MeshLambertMaterial({color: 0xFF00CC});
+                c[i][j] = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), material);
                 c[i][j].position = {x:i*100, y:0, z:j*100};
+                c[i][j].rotation.x = -Math.PI/2;
                 obj['cubex'+i+'y'+j] = c[i][j];
             }
         }

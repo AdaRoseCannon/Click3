@@ -51,5 +51,5 @@ require.config({
     }
 });
 
-require(['render']);
+require(['scene']);
 

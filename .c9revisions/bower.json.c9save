@@ -1,2 +1,0 @@
-{"ts":1377426107757,"silentsave":true,"restoring":false,"patch":[[{"diffs":[[1,"{\n  \"name\": \"593135\",\n  \"version\": \"0.0.0\",\n  \"dependencies\": {\n    \"modernizr\": \"~2.6.2\",\n    \"jquery\": \"~1.9.1\"\n  },\n  \"devDependencies\": {}\n}\n"]],"start1":0,"start2":0,"length1":0,"length2":145}]],"length":145}
-{"contributors":[],"silentsave":false,"ts":1377453397783,"patch":[[{"diffs":[[0,"\"~1.9.1\""],[1,",\n    \"threejs\": \"*\""],[0,"\n  },\n  "]],"start1":105,"start2":105,"length1":16,"length2":36}]],"length":165,"saved":false}
