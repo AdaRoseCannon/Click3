@@ -1,6 +1,10 @@
 /*global define, THREE, $, renderer*/
-define(['jquery', 'three'], function($, three) {
+define(['jquery', 'three', 'libs/store'], function($, three, Store) {
     'use strict';
+    var store = new Store();
+    store.addCategory('globals');
+    store.addCategory('render');
+    var render = store.data.render;
 
     var scene = new THREE.Scene();
     var bigPlane = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), new THREE.MeshBasicMaterial({
@@ -14,16 +18,23 @@ define(['jquery', 'three'], function($, three) {
     scene.add(bigPlane);
     var WIDTH = 480;
     var HEIGHT = WIDTH * document.documentElement.clientHeight / document.documentElement.clientWidth;
-    var VIEW_ANGLE = 45,
-        ASPECT = WIDTH / HEIGHT,
-        NEAR = 0.1,
-        FAR = 10000;
+    var VIEW_ANGLE = 45;
+    var ASPECT = WIDTH / HEIGHT;
+    var NEAR = 0.1;
+    var FAR = 10000;
     var sceneObjects = [];
-    window.renderer = new THREE.WebGLRenderer();
+    var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+    var renderer = new THREE.WebGLRenderer();
     renderer.setSize(WIDTH, HEIGHT);
     $container.append(renderer.domElement);
-    var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
     //var camera = new THREE.OrthographicCamera( WIDTH / - 1, WIDTH / 1, HEIGHT / 1, HEIGHT / - 1, NEAR, FAR );
+    
+    render.set('sceneObjects', sceneObjects);
+    render.set('renderer', renderer);
+    render.set('scene', scene);
+    render.set('camera', camera);
+    render.set('bigPlane', bigPlane);
+    render.set('actualDimensions', {width: renderer.domElement.clientWidth, height: renderer.domElement.clientHeight});
 
     function addObject(obj) {
         for (var key in obj) {
@@ -73,40 +84,7 @@ define(['jquery', 'three'], function($, three) {
         camera: camera,
         light: pointLight
     });
-
-    require(['libs/pointerInteractions', 'libs/requestAnimSingleton', 'renderloop', 'libs/selectObjectFromScreen'], function(PointerInteractions, AnimRequest, renderloop, selectObjectFromScreen) {
-        var mouseEventHandler = new PointerInteractions(renderer.domElement);
-
-        var doer = new AnimRequest(function() {
-            renderloop(renderer, scene, camera);
-        });
-        doer.start();
-
-        mouseEventHandler.addClickHandler(function(e) {
-            var collide = selectObjectFromScreen(e.detail.x, e.detail.y, camera, sceneObjects);
-            if (collide) collide.object.material.color.setHex(Math.random() * 0xffffff);
-        });
-
-        var cameraDragStart = false;
-        var cameraDragStartPosition = false;
-        mouseEventHandler.addDragStartHandler(function(e) {
-            bigPlane.position.x = camera.position.x;
-            bigPlane.position.z = camera.position.z;
-            cameraDragStartPosition = camera.position;
-            cameraDragStart = selectObjectFromScreen(e.detail.x, e.detail.y, camera, [bigPlane]).point;
-        });
-
-        mouseEventHandler.addDragEndHandler(function(e) {
-            cameraDragStart = false;
-            cameraDragStartPosition = false;
-        });
-
-        mouseEventHandler.addDragHandler(function(e) {
-            var collide = selectObjectFromScreen(e.detail.current.x, e.detail.current.y, camera, [bigPlane]);
-            if (cameraDragStart && collide) {
-                camera.position.x = cameraDragStartPosition.x - (collide.point.x - cameraDragStart.x);
-                camera.position.z = cameraDragStartPosition.z - (collide.point.z - cameraDragStart.z);
-            }
-        });
-    });
+    
+    render.set('objects', sceneObjects);
+    require(['bindings']);
 });

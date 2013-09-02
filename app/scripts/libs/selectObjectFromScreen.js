@@ -1,8 +1,9 @@
 /*global define, THREE, $, renderer*/
-define([], function () {
+define(['libs/store'], function (Store) {
 
-    var ACTUALWIDTH = renderer.domElement.clientWidth;
-    var ACTUALHEIGHT = renderer.domElement.clientHeight;
+    var actualDimensions = (new Store()).data.render.get('actualDimensions');
+    var ACTUALWIDTH = actualDimensions.width;
+    var ACTUALHEIGHT = actualDimensions.height;
     
     return function selectObjectFromScreen(x, y, camera, objects) {
 

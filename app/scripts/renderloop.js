@@ -1,6 +1,5 @@
-define([], function () {
+define(['libs/store'], function (Store) {
 	var oldTime = 0;
-
 	return function (renderer, scene, camera, mouseEventHandler) {
 		var newTime = Date.now();
 		var fps = 0;
