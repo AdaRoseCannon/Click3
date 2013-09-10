@@ -1,3 +1,4 @@
+/*global define, THREE, $*/
 define(['libs/store'], function (Store) {
 	var oldTime = 0;
 	return function (renderer, scene, camera, mouseEventHandler) {

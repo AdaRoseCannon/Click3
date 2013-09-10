@@ -1,5 +1,5 @@
-/*global define, THREE, $, renderer*/
-define(['jquery', 'three', 'libs/store'], function($, three, Store) {
+/*global define, THREE, $*/
+define(['jquery', 'three', 'libs/store', 'libs/tile'], function($, three, Store, Tile) {
     'use strict';
     var store = new Store();
     store.addCategory('globals');
@@ -46,38 +46,20 @@ define(['jquery', 'three', 'libs/store'], function($, three, Store) {
     }
     camera.position.z = 300;
     camera.position.y = 300;
-    camera.lookAt({
-        x: 500,
-        y: 0,
-        z: 500
-    });
+    camera.lookAt({x: 500, y: 0, z: 500});
 
     var c = [];
     var obj = {};
     for (var i = 0; i < 10; i++) {
         c[i] = [];
         for (var j = 0; j < 10; j++) {
-            var material = new THREE.MeshLambertMaterial({
-                color: 0xFF00CC
-            });
-            c[i][j] = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), material);
-            c[i][j].position = {
-                x: i * 100,
-                y: 0,
-                z: j * 100
-            };
-            c[i][j].rotation.x = -Math.PI / 2;
-            obj['cubex' + i + 'y' + j] = c[i][j];
+            obj['cubex' + i + 'y' + j] = (new Tile({position: {x: i * 100, y: 0, z: j * 100}})).getModel(0);
         }
     }
     addObject(obj);
 
     var pointLight = new THREE.PointLight(0xFFFFFF);
-    pointLight.position = {
-        x: 10,
-        y: 500,
-        z: 130
-    };
+    pointLight.position = {x: 10, y: 500, z: 130};
 
     // add to the scene
     addObject({
@@ -86,5 +68,6 @@ define(['jquery', 'three', 'libs/store'], function($, three, Store) {
     });
     
     render.set('objects', sceneObjects);
+    render.set('clickables', sceneObjects);
     require(['bindings']);
 });
