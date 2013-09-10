@@ -4,3 +4,4 @@ dist
 .sass-cache
 .c9revisions
 app/bower_components
+app/styles/*.css
