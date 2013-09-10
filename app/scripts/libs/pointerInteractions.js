@@ -1,5 +1,6 @@
+/* globals define */
 define([], function () {
-
+	'use strict';
 	(function () {
 		function CustomEvent(event, params) {
 			params = params || {
@@ -19,12 +20,11 @@ define([], function () {
 
 	function Stack() {
 		try {
-			throw Error()
+			throw new Error();
+		} catch (ex) {
+			return ex.stack;
 		}
-		catch (ex) {
-			return ex.stack
-		}
-	};
+	}
 
 	return function (listenTarget) {
 		var oldPos = {
@@ -45,24 +45,32 @@ define([], function () {
 
 		var getEventLocation = function (e) {
 			var newPos;
-			if (e.clientX) newPos = {
-				x: e.clientX,
-				y: e.clientY
-			};
+			if (e.clientX) {
+				newPos = {
+					x: e.clientX,
+					y: e.clientY
+				};
+			}
 			if (e.touches && e.touches.length > 0) {
 				newPos = {
 					x: e.touches[0].clientX,
 					y: e.touches[0].clientY
 				};
 			}
-			if (newPos === undefined) return;
+			if (newPos === undefined) {
+				return;
+			}
 			return newPos;
 		};
 
 		var mousemove = function (e) {
-			if (Date.now() - debounce <= 16) return;
+			if (Date.now() - debounce <= 16) {
+				return;
+			}
 			var newPos = getEventLocation(e);
-			if (newPos === undefined) return;
+			if (newPos === undefined) {
+				return;
+			}
 			oldPos = newPos;
 			var event = new window.CustomEvent('pi-move', {
 				'detail': newPos
@@ -157,14 +165,14 @@ define([], function () {
 			if (!disableMouseEvents) {
 				mousedown(e);
 			}
-		}
+		};
 
 		var cursorUp = function (e) {
 			if (!disableMouseEvents) {
 				mouseup(e);
 			}
 			disableMouseEvents = false;
-		}
+		};
 
 		var touchCancel = function (e) {
 			console.warn('touchcancel');
@@ -199,11 +207,11 @@ define([], function () {
 		listenTarget.addEventListener('mousemove', mousemove, false);
 		listenTarget.addEventListener('mousedown', cursorDown, false);
 		listenTarget.addEventListener('mouseup', cursorUp, false);
-		el.addEventListener("touchstart", touchStart, false);
-		el.addEventListener("touchend", touchEnd, false);
-		el.addEventListener("touchcancel", touchCancel, false);
-		el.addEventListener("touchleave", touchEnd, false);
-		el.addEventListener("touchmove", touchMove, false);
+		el.addEventListener('touchstart', touchStart, false);
+		el.addEventListener('touchend', touchEnd, false);
+		el.addEventListener('touchcance', touchCancel, false);
+		el.addEventListener('touchleave', touchEnd, false);
+		el.addEventListener('touchmove', touchMove, false);
 
 	};
 });

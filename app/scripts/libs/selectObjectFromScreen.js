@@ -1,6 +1,6 @@
 /*global define, THREE, $, renderer*/
 define(['libs/store'], function (Store) {
-
+    'use strict';
     var actualDimensions = (new Store()).data.render.get('actualDimensions');
     var ACTUALWIDTH = actualDimensions.width;
     var ACTUALHEIGHT = actualDimensions.height;
@@ -28,5 +28,5 @@ define(['libs/store'], function (Store) {
         else {
             return false;
         }
-    }
+    };
 });

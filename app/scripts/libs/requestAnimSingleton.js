@@ -1,4 +1,6 @@
+/* globals define */
 define([], function () {
+	'use strict';
 	function AnimRequest(taskIn) {
 		if (AnimRequest.prototype._singletonInstance) {
 			return AnimRequest.prototype._singletonInstance;

@@ -52,12 +52,14 @@ require.config({
 });
 
 function hideHud() {
+	'use strict';
     require(['jquery'], function () {
         $('.hud').get(0).innerHTML = '';
     });
 }
 
 function startApp() {
+	'use strict';
     hideHud();
     require(['scene', 'libs/store'], function (elem, Store) {
         var render = (new Store()).data.render;
@@ -75,5 +77,6 @@ function startApp() {
 }
 
 function mapGen() {
+	'use strict';
     hideHud();
 }
