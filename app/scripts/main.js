@@ -51,16 +51,29 @@ require.config({
 	}
 });
 
-require(['scene', 'libs/store'], function (elem, Store) {
-    var render = (new Store()).data.render;
-    $('body').append(elem);
-    render.set('actualDimensions', {width: elem.clientWidth, height: elem.clientHeight});
-    if (elem.requestFullscreen) {
-        elem.requestFullscreen();
-    } else if (elem.mozRequestFullScreen) {
-        elem.mozRequestFullScreen();
-    } else if (elem.webkitRequestFullscreen) {
-        elem.webkitRequestFullscreen();
-    }
-    require(['bindings']);
-});
+function hideHud() {
+    require(['jquery'], function () {
+        $('.hud').get(0).innerHTML = '';
+    });
+}
+
+function startApp() {
+    hideHud();
+    require(['scene', 'libs/store'], function (elem, Store) {
+        var render = (new Store()).data.render;
+        $('body').append(elem);
+        render.set('actualDimensions', {width: elem.clientWidth, height: elem.clientHeight});
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        }
+        require(['bindings']);
+    });
+}
+
+function mapGen() {
+    hideHud();
+}

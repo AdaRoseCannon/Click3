@@ -28,11 +28,10 @@ body {
     padding: 0.2em 0;
 }
 
-body, html {
+body, html, .hud {
     margin: 0;
     padding: 0;
     height: 100%;
-    background:black;
     overflow:hidden;
     width:100%;
 }
@@ -40,4 +39,15 @@ body, html {
 body > canvas {
     width: 100%;
     height:auto;
+    background-color:black;
+    position:absolute;
+    top: 0;
+    left: 0;
+}
+
+.hud {
+    z-index: 100;
+    position:absolute;
+    top: 0;
+    left: 0;
 }
