@@ -3,9 +3,8 @@ $iconWhiteSpritePath: "../images/glyphicons-halflings-white.png";
 
 @import 'sass-bootstrap/lib/bootstrap';
 
-.hero-unit {
-    margin: 50px auto 0 auto;
-    width: 300px;
+.jumbotron {
+    margin: 50px auto 0 10%;
 }
 
 .browsehappy {
@@ -43,4 +42,9 @@ body > canvas {
     position:absolute;
     top: 0;
     left: 0;
+    pointer-events: none;
+}
+
+.hud > * {
+    pointer-events: auto;
 }

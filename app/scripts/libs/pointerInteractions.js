@@ -179,7 +179,7 @@ define([], function () {
 			mouseup(e, true);
 		};
 
-		this.getCoords = function () {
+		this.getCoords = function (e) {
 			return oldPos;
 		};
 
@@ -212,6 +212,5 @@ define([], function () {
 		el.addEventListener('touchcance', touchCancel, false);
 		el.addEventListener('touchleave', touchEnd, false);
 		el.addEventListener('touchmove', touchMove, false);
-
 	};
 });
