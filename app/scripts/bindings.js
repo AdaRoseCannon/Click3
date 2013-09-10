@@ -1,15 +1,12 @@
 define(['libs/pointerInteractions', 'libs/requestAnimSingleton', 'renderloop', 'libs/selectObjectFromScreen', 'libs/store'], function(PointerInteractions, AnimRequest, renderloop, selectObjectFromScreen, Store) {
     
-    var store = new Store();
-    var render = store.data.render;
+    var render = (new Store()).data.render;
     var renderer = render.get('renderer');
     var scene = render.get('scene');
     var camera = render.get('camera');
     var sceneObjects = render.get('sceneObjects');
     var bigPlane = render.get('bigPlane');
-    
     var mouseEventHandler = new PointerInteractions(renderer.domElement);
-
 
     var doer = new AnimRequest(function() {
         renderloop(renderer, scene, camera);

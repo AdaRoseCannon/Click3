@@ -13,7 +13,6 @@ define(['jquery', 'three', 'libs/store', 'libs/tile'], function($, three, Store,
         transparent: true,
         opacity: 0
     }));
-    var $container = $('body');
     bigPlane.rotation.x = -Math.PI / 2;
     scene.add(bigPlane);
     var WIDTH = 480;
@@ -26,7 +25,6 @@ define(['jquery', 'three', 'libs/store', 'libs/tile'], function($, three, Store,
     var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
     var renderer = new THREE.WebGLRenderer();
     renderer.setSize(WIDTH, HEIGHT);
-    $container.append(renderer.domElement);
     //var camera = new THREE.OrthographicCamera( WIDTH / - 1, WIDTH / 1, HEIGHT / 1, HEIGHT / - 1, NEAR, FAR );
     
     render.set('sceneObjects', sceneObjects);
@@ -34,7 +32,6 @@ define(['jquery', 'three', 'libs/store', 'libs/tile'], function($, three, Store,
     render.set('scene', scene);
     render.set('camera', camera);
     render.set('bigPlane', bigPlane);
-    render.set('actualDimensions', {width: renderer.domElement.clientWidth, height: renderer.domElement.clientHeight});
 
     function addObject(obj) {
         for (var key in obj) {
@@ -69,5 +66,6 @@ define(['jquery', 'three', 'libs/store', 'libs/tile'], function($, three, Store,
     
     render.set('objects', sceneObjects);
     render.set('clickables', sceneObjects);
-    require(['bindings']);
+    
+    return renderer.domElement;
 });

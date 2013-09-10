@@ -51,4 +51,16 @@ require.config({
 	}
 });
 
-require(['scene']);
+require(['scene', 'libs/store'], function (elem, Store) {
+    var render = (new Store()).data.render;
+    $('body').append(elem);
+    render.set('actualDimensions', {width: elem.clientWidth, height: elem.clientHeight});
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+    } else if (elem.mozRequestFullScreen) {
+        elem.mozRequestFullScreen();
+    } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+    }
+    require(['bindings']);
+});
