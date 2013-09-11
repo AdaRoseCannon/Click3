@@ -26,6 +26,13 @@ module.exports = function (grunt) {
 
     grunt.initConfig({
         yeoman: yeomanConfig,
+        traceur: {
+            custom: {
+                files:{
+                    '.tmp/': ['<%= yeoman.app %>/scripts/{,*/}*.js']
+                }
+            },
+        },
         watch: {
             coffee: {
                 files: ['<%= yeoman.app %>/scripts/{,*/}*.coffee'],
@@ -382,6 +389,7 @@ module.exports = function (grunt) {
 
     grunt.registerTask('build', [
         'clean:dist',
+        'traceur',
         'useminPrepare',
         'concurrent:dist',
         'autoprefixer',

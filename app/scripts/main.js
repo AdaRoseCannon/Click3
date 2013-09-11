@@ -79,4 +79,7 @@ function startApp() {
 function mapGen() {
 	'use strict';
     hideHud();
+    require(['mapGen/main']);
 }
+
+mapGen();
