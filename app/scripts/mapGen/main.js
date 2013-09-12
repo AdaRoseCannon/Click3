@@ -1,6 +1,7 @@
 /* globals define, $*/
 define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 	'use strict';
+	var v = new Voronoi();
 	function setup () {
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
@@ -18,14 +19,19 @@ define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 
 		var points = [];
 
-		var v = new Voronoi();
-
 		for (var i=0; i<noPoints; i++) {
 			points[i] = {x: bbox.xr*Math.random(), y: bbox.yb*Math.random()};
 		}
 
 		var diagram = v.compute(points, bbox);
+		diagram = relax(diagram, bbox);
+		diagram = relax(diagram, bbox);
+		render (canvas, ctx, diagram);
+	}
+	setup();
 
+	function relax (diagram, bbox) {
+		var points = [];
 		//relax by making the new point the average of the vertices.
 		for(var cell in diagram.cells) {
 			var px = 0, py = 0, n = 0;
@@ -37,14 +43,10 @@ define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 			}
 			points[cell] = {x: px/n, y: py/n};
 		}
-		diagram = v.compute(points, bbox);
-
-		console.log(diagram);
-		render (canvas, ctx, diagram, points);
+		return v.compute(points, bbox);
 	}
-	setup();
 
-	function render (canvas, ctx, diagram, points) {
+	function render (canvas, ctx, diagram) {
 		ctx.globalAlpha = 1;
 		ctx.beginPath();
 		ctx.rect(0,0,canvas.width,canvas.height);
@@ -71,9 +73,9 @@ define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 		// sites
 		ctx.beginPath();
 		ctx.fillStyle = '#44f';
-		var iSite = points.length;
+		var iSite = diagram.cells.length;
 		while (iSite--) {
-			vertex = points[iSite];
+			vertex = diagram.cells[iSite].site;
 			ctx.rect(vertex.x-2/3,vertex.y-2/3,2,2);
 		}
 		ctx.fill();
