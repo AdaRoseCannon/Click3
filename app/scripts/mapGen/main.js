@@ -46,12 +46,20 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		var data = {};
 		data.vertices = [];
+		data.edgeVertices = [];
 		data.polys = [];
 
 		var addVertex = function (vertex, cell) {
 			var inArray = data.vertices.indexOf(vertex);
+			var vertexObject = JSON.parse(vertex);
 			if (inArray === -1) {
-				data.polys[cell].vertices.push(data.vertices.push(vertex)-1);
+				var newVertexIndex = data.vertices.push(vertex)-1;
+				data.polys[cell].vertices.push(newVertexIndex);
+				if(vertexObject.x === 0 || vertexObject.y === 0) {
+					data.edgeVertices.push(newVertexIndex);
+					return true;
+				}
+				return false;
 			} else {
 				var inPoly = data.polys[cell].vertices.indexOf(inArray);
 				if (inPoly === -1) {
@@ -59,6 +67,10 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				} else {
 					data.polys[cell].vertices[inPoly] = inArray;
 				}
+				if(data.edgeVertices.indexOf(inArray)) {
+					return true;
+				}
+				return false;
 			}
 		};
 
@@ -71,15 +83,19 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			data.polys[cell].area = 0;
 			data.polys[cell].areaValue = 0;
 			data.polys[cell].averageValue = 0;
-			data.polys[cell].land = false;
+			data.polys[cell].land = null;
+			var edgeVertex = false;
 			for(var halfedge in diagram.cells[cell].halfedges) {
 				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
 				var vb = diagram.cells[cell].halfedges[halfedge].edge.vb;
 				//use JSON.stringify as a hash to check the array against
 				var vertex1 = JSON.stringify({x: va.x - data.polys[cell].origin.x, y: va.y - data.polys[cell].origin.y});
 				var vertex2 = JSON.stringify({x: vb.x - data.polys[cell].origin.x, y: vb.y - data.polys[cell].origin.y});
-				addVertex(vertex1, cell);
-				addVertex(vertex2, cell);
+				edgeVertex = addVertex(vertex1, cell);
+				edgeVertex = addVertex(vertex2, cell) || edgeVertex;
+			}
+			if (edgeVertex) {
+				data.polys[cell].land = false;
 			}
 		}
 
@@ -161,7 +177,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			data.polys[i].areaValue /= data.polys[i].area;
 			data.polys[i].area /= totalArea;
 
-			if (areaUsed < maxArea) {
+			if (data.polys[i].land === null && areaUsed < maxArea) {
 				data.polys[i].land = true;
 				areaUsed += data.polys[i].area;
 			}
