@@ -124,6 +124,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var pix = imgd.data;
 		// Loop over each pixel and invert the color.
 		var n = 0;
+		var totalArea = 0;
 		for (var i = 0, l = pix.length; i < l; i += 4) {
 		    var red = pad(pix[i  ].toString(16),2);
 		    var blue = pad(pix[i+1].toString(16),2);
@@ -133,13 +134,25 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		    //if (Math.random() < 0.01) console.log(col);
 		    var indexOfKey = cellKey.indexOf(col);
 		    if (indexOfKey !== -1) {
+				totalArea++;
 				data.polys[indexOfKey].area++;
-				var x = i % (bbox.xr - bbox.xl);
-				var y = Math.floor(i / (bbox.xr - bbox.xl));
-				data.polys[indexOfKey].areaValue += getPerlin({x: x, y: y, z: 0}, -0.3, 0.3, 20);
+				var x = (i/4) % (bbox.xr - bbox.xl);
+				var y = Math.floor((i/4) / (bbox.xr - bbox.xl));
+				var perlinValue = getPerlin({x: x, y: y, z: 0}, -0.3, 0.3, 20);
+				data.polys[indexOfKey].areaValue += perlinValue;
+				pix[i+2] = Math.floor(256 * perlinValue,16);
 		    }
 		}
+		ctx.putImageData(imgd, bbox.xl, bbox.yt);
 
+		//Iterate over the cells average the values and normalize the area.
+		for(i=0,l=data.polys.length;i<l;i++) {
+			totalArea += data.polys[i].area;
+			data.polys[i].areaValue /= data.polys[i].area;
+			data.polys[i].area /= totalArea;
+		}
+
+		renderCells(canvas, ctx, data, true);
 	}
 
 	function getPerlin(point, min, max, zoom) {
@@ -210,11 +223,16 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 	}
 
-	function renderCells (canvas, ctx, cells) {
+	function renderCells (canvas, ctx, cells, hasData) {
 		var cellKey = [];
 		for(var i=0,l=cells.polys.length;i<l;i++) {
 			var key = pad(i.toString(16),6);
 			cellKey[i] = key;
+			if (hasData) {
+				var val = pad((256*cells.polys[i].areaValue).toString(16),2);
+				key = val + '0000';
+				ctx.globalCompositeOperation='lighter';
+			}
 			ctx.fillStyle = '#' + key;
 			ctx.beginPath();
 			var v = null;
@@ -230,6 +248,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			ctx.closePath();
 			ctx.fill();
 		}
+		ctx.globalCompositeOperation='source-over';
 		return cellKey;
 	}
 });
