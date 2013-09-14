@@ -82,20 +82,17 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//Sort the cell vertices so that they are anticlockwise;
 		(function () {
 			function sortCell (cell) {
-				var tempCell = [];
-				for(var vert in cell.vertices) {
-					tempCell[vert] = data.vertices[cell.vertices[vert]];
-				}
-				tempCell = tempCell.sort(function (a,b) {
+				return cell.sort(function (aIn,bIn) {
 					//convert cartesian coordinates to polar
+					var a = data.vertices[aIn];
+					var b = data.vertices[bIn];
 					var angleA = Math.atan2(a.y,a.x);
 					var angleB = Math.atan2(b.y,b.x);
-					console.log(angleB);
 					return  angleA - angleB;
 				});
 			}
 			for(var cell in data.polys) {
-				sortCell(data.polys[cell]);
+				data.polys[cell].vertices = sortCell(data.polys[cell].vertices);
 			}
 		})();
 
@@ -198,6 +195,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				}
 			}
 			ctx.closePath();
+			ctx.rect(cells.polys[i].origin.x-2/3,cells.polys[i].origin.y-2/3,2,2);
 			ctx.fill();
 		}
 	}
