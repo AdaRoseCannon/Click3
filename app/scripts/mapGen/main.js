@@ -71,6 +71,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			data.polys[cell].area = 0;
 			data.polys[cell].areaValue = 0;
 			data.polys[cell].averageValue = 0;
+			data.polys[cell].land = false;
 			for(var halfedge in diagram.cells[cell].halfedges) {
 				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
 				var vb = diagram.cells[cell].halfedges[halfedge].edge.vb;
@@ -147,12 +148,23 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		ctx.putImageData(imgd, bbox.xl, bbox.yt);
 
 		//Iterate over the cells average the values and normalize the area.
+		//Determine if the land is land or sea.
+		//Sort the cells by perlin value;
+
+		function cellSortFunction (a,b) {
+			return b.areaValue - a.areaValue;
+		}
+		var areaUsed = 0;
+		data.polys = data.polys.sort(cellSortFunction);
 		for(i=0,l=data.polys.length;i<l;i++) {
 			totalArea += data.polys[i].area;
 			data.polys[i].areaValue /= data.polys[i].area;
 			data.polys[i].area /= totalArea;
-			console.log(data.polys[i].areaValue);
 
+			if (areaUsed < maxArea) {
+				data.polys[i].land = true;
+				areaUsed += data.polys[i].area;
+			}
 		}
 
 		renderCells(canvas, ctx, data, true);
@@ -226,38 +238,30 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 	}
 
-	function renderCells (canvas, ctx, cells, hasData) {
-		function cellSortFunction (a,b) {
-			return b.areaValue - a.areaValue;
-		}
+	function renderCells (canvas, ctx, data, hasData) {
 
 		var cellKey = [];
-		var areaUsed = 0;
-		var tempCells = cells.polys.sort(cellSortFunction);
-		for(var i=0,l=tempCells.length;i<l;i++) {
+		for(var i=0,l=data.polys.length;i<l;i++) {
 			var key = pad(i.toString(16),6);
 			cellKey[i] = key;
 			if (hasData) {
-
-				if (areaUsed < maxArea) {
+				if (data.polys[i].land) {
 					key = 'ff0000';
-					areaUsed += tempCells[i].area;
 				} else {
 					key = '000000';
 				}
-
 				ctx.globalCompositeOperation='lighter';
 			}
 			ctx.fillStyle = '#' + key;
 			ctx.beginPath();
 			var v = null;
-			for (var j=0,l2=tempCells[i].vertices.length;j<l2;j++) {
+			for (var j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
 				if (v === null) {
-					v = cells.vertices[tempCells[i].vertices[j]];
-					ctx.moveTo(v.x + tempCells[i].origin.x, v.y + tempCells[i].origin.y);
+					v = data.vertices[data.polys[i].vertices[j]];
+					ctx.moveTo(v.x + data.polys[i].origin.x, v.y + data.polys[i].origin.y);
 				} else {
-					v = cells.vertices[tempCells[i].vertices[j]];
-					ctx.lineTo(v.x + tempCells[i].origin.x, v.y + tempCells[i].origin.y);
+					v = data.vertices[data.polys[i].vertices[j]];
+					ctx.lineTo(v.x + data.polys[i].origin.x, v.y + data.polys[i].origin.y);
 				}
 			}
 			ctx.closePath();
