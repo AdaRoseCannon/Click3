@@ -20,5 +20,6 @@
     "trailing": true,
     "smarttabs": true,
     "jquery": true,
-    "multistr": true
+    "multistr": true,
+    "bitwise": true
 }

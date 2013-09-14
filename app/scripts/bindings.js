@@ -9,7 +9,7 @@ define(['libs/pointerInteractions', 'libs/requestAnimSingleton', 'renderloop', '
     var bigPlane = render.get('bigPlane');
     var mouseEventHandler = new PointerInteractions(renderer.domElement);
 
-    var doer = new AnimRequest(function () {
+    var doer = new AnimRequest('renderloop', function () {
         renderloop(renderer, scene, camera);
     });
     doer.start();

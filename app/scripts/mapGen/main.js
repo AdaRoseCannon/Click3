@@ -1,7 +1,8 @@
 /* globals define, $*/
-define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
+define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton'], function ($, Voronoi, Perlin, AnimRequest) {
 	'use strict';
 	var v = new Voronoi();
+	var perlin = new Perlin();
 	function setup () {
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
@@ -14,7 +15,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 		var canvas = $(wrapper).find('canvas').get(0);
 		var ctx=canvas.getContext('2d');
 
-		var bbox = {xl:0,xr:800,yt:0,yb:600};
+		var bbox = {xl:0,xr:400,yt:0,yb:400};
 		var noPoints = 100;
 
 		var points = [];
@@ -27,6 +28,31 @@ define(['jquery', 'mapGen/rhill-voronoi-core'], function ($, Voronoi) {
 		diagram = relax(diagram, bbox);
 		diagram = relax(diagram, bbox);
 		render (canvas, ctx, diagram);
+
+		var z=0;
+		var total = 0;
+		var amount = 0;
+		var min = -1;
+		var max = 1;
+		var doer = new AnimRequest('perlin', function () {
+			(function (z) {
+				ctx.beginPath();
+				for (var x = bbox.xl, y; x < bbox.xr; x++) {
+					for (y = bbox.yt; y <= bbox.yb; y++) {
+						ctx.fillStyle = '#000';
+						var noise = perlin.noise(x/100,y/100,z/100);
+						noise = noise - min;
+						noise *= 1/(max - min);
+						amount++;
+						total += noise;
+						var hex = Math.floor(parseInt((0xFF).toString(10)) * noise).toString(16);
+						ctx.fillStyle = '#' + hex + hex + hex;
+						ctx.fillRect(x,y,1,1);
+					}
+				}
+			})(z++ % 100);
+	    });
+	    doer.once();
 	}
 	setup();
 

@@ -1,8 +1,13 @@
 /* globals define */
 define([], function () {
 	'use strict';
-	function AnimRequest(taskIn) {
+	function AnimRequest(id, taskIn) {
+		if (id === undefined || (typeof id) === 'function') {
+			console.error('No id defined for AnimRequest');
+			return;
+		}
 		if (AnimRequest.prototype._singletonInstance) {
+			AnimRequest.prototype._singletonInstance.push(id, taskIn);
 			return AnimRequest.prototype._singletonInstance;
 		}
 		AnimRequest.prototype._singletonInstance = this;
@@ -14,20 +19,33 @@ define([], function () {
 		})();
 
 		var doing = false;
-		var task = taskIn;
+		var tasks = {};
 
 		this.start = function () {
-			doThing();
 			doing = true;
+			doThing();
+		};
+
+		this.once = function () {
+			doThing();
 		};
 
 		this.stop = function () {
 			doing = false;
 		};
 
+		this.push = function (id, taskIn) {
+			tasks[id] = taskIn;
+		};
+		this.push(id, taskIn);
+
 		var doThing = function () {
-			task();
-			requestAnimFrame(doThing);
+			for (var task in tasks){
+				tasks[task]();
+			}
+			if(doing){
+				requestAnimFrame(doThing);
+			}
 		};
 	}
 	return AnimRequest;
