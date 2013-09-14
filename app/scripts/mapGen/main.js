@@ -8,7 +8,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	function pad(n, len) {
 		return (new Array(len + 1).join('0') + n).slice(-len);
 	}
-
 	function setup () {
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
@@ -22,7 +21,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var ctx=canvas.getContext('2d');
 
 		var bbox = {xl:0,xr:400,yt:0,yb:400};
-		var noPoints = 100;
+		var noPoints = 150;
 
 		var points = [];
 		(function () {
@@ -67,6 +66,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		for(var cell in diagram.cells) {
 			data.polys[cell] = {};
 			data.polys[cell].vertices = [];
+			data.polys[cell].adjacent = [];
 			data.polys[cell].origin = {};
 			data.polys[cell].origin.x = diagram.cells[cell].site.x;
 			data.polys[cell].origin.y = diagram.cells[cell].site.y;
@@ -79,8 +79,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
 				var vb = diagram.cells[cell].halfedges[halfedge].edge.vb;
 				//use JSON.stringify as a hash to check the array against
-				var vertex1 = JSON.stringify({x: va.x - data.polys[cell].origin.x, y: va.y - data.polys[cell].origin.y});
-				var vertex2 = JSON.stringify({x: vb.x - data.polys[cell].origin.x, y: vb.y - data.polys[cell].origin.y});
+				var vertex1 = JSON.stringify({x: va.x, y: va.y});
+				var vertex2 = JSON.stringify({x: vb.x, y: vb.y});
 				addVertex(vertex1, cell);
 				addVertex(vertex2, cell);
 				if (va.x === bbox.xl || va.x === bbox.xr || va.y === bbox.yt || va.y === bbox.yb) {
@@ -90,8 +90,9 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 					edgeVertex = true;
 				}
 			}
+			data.polys[cell].edgesCount = data.polys[cell].vertices.length - 1;
 			if (edgeVertex) {
-				data.polys[cell].land = 'forcedOcean';
+				data.polys[cell].land = 'forcedWater';
 			}
 		}
 
@@ -105,17 +106,18 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//Sort the cell vertices so that they are anticlockwise;
 		(function () {
 			function sortCell (cell) {
-				return cell.sort(function (aIn,bIn) {
+				var origin = cell.origin;
+				return cell.vertices.sort(function (aIn,bIn) {
 					//convert cartesian coordinates to polar
 					var a = data.vertices[aIn];
 					var b = data.vertices[bIn];
-					var angleA = Math.atan2(a.y,a.x);
-					var angleB = Math.atan2(b.y,b.x);
+					var angleA = Math.atan2(a.y - origin.y,a.x - origin.x);
+					var angleB = Math.atan2(b.y - origin.y,b.x - origin.x);
 					return  angleA - angleB;
 				});
 			}
 			for(var cell in data.polys) {
-				data.polys[cell].vertices = sortCell(data.polys[cell].vertices);
+				data.polys[cell].vertices = sortCell(data.polys[cell]);
 			}
 		})();
 
@@ -161,31 +163,85 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//Iterate over the cells average the values and normalize the area.
 		//Determine if the land is land or sea.
 		//Sort the cells by perlin value;
+		function isAdjacent (a ,b) {
+			if (b.index === a.index) {
+				return false;
+			}
+			if (b.adjacent.indexOf(a.index) !== -1) {
+				return true;
+			}
+			if (a.adjacent.length >= a.edgesCount) {
+				return false;
+			}
+			if (b.adjacent.length >= b.edgesCount) {
+				return false;
+			}
+			for (var v=0, l=a.vertices.length; v<l; v++) {
+				var result = b.vertices.indexOf(a.vertices[v]);
 
+				if (result >= 0) {
+					if (b.vertices.indexOf(a.vertices[(v - 1) % l]) !== -1) {
+						a.adjacent.push(b.index);
+						b.adjacent.push(a.index);
+						return true;
+					}
+					if (b.vertices.indexOf(a.vertices[(v + 1) % l]) !== -1) {
+						a.adjacent.push(b.index);
+						b.adjacent.push(a.index);
+						return true;
+					}
+				}
+			}
+			return false;
+		}
 		function cellSortFunction (a,b) {
 			return b.areaValue - a.areaValue;
 		}
 		var areaUsed = 0;
+		var oceanSeed;
 		data.polys = data.polys.sort(cellSortFunction);
 		for(i=0,l=data.polys.length;i<l;i++) {
+			data.polys[i].index = i;
 			totalArea += data.polys[i].area;
 			data.polys[i].areaValue /= data.polys[i].area;
 			data.polys[i].area /= totalArea;
-			if (areaUsed < maxArea) {
-				if(data.polys[i].land === null) {
+
+			if(data.polys[i].land === null) {
+				if (areaUsed < maxArea) {
 					data.polys[i].land = 'land';
 					areaUsed += data.polys[i].area;
+				} else {
+					data.polys[i].land = 'lake';
 				}
 			}
-
-
-			//calculateAdjacent using delaunay traingles
-
-			
-
-			//flood oceans in from corner
+			if (oceanSeed === undefined && data.polys[i].land === 'forcedWater') {
+				oceanSeed = data.polys[i];
+			}
 
 		}
+
+		//create delaunay traingles adjacentiness
+		for(i=0,l=data.polys.length;i<l;i++) {
+			for(var j=0;j<l;j++) {
+				if (isAdjacent (data.polys[i], data.polys[j])) {
+					if (data.polys[i].adjacent.length >= data.polys[i].edgesCount) {
+						break;
+					}
+				}
+			}
+		}
+
+		//flood oceans in from corner
+		function recursiveFlood(seed) {
+			seed.land = 'ocean';
+			for (var key in seed.adjacent) {
+				var next = data.polys[seed.adjacent[key]];
+				if (next.land !== 'land' && next.land !== 'ocean') {
+					recursiveFlood(next);
+				}
+			}
+		}
+		recursiveFlood(oceanSeed);
 
 		renderCells(canvas, ctx, data, true);
 	}
@@ -264,12 +320,20 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			var key = pad(i.toString(16),6);
 			cellKey[i] = key;
 			if (hasData) {
-				if (data.polys[i].land === 'land') {
+				switch (data.polys[i].land) {
+				case 'land':
 					key = 'ff0000';
-				} else {
+					break;
+				case 'lake':
+					key = '00ffff';
+					break;
+				case 'ocean':
+					key = '000066';
+					break;
+				default:
 					key = '000000';
 				}
-				ctx.globalCompositeOperation='lighter';
+				//ctx.globalCompositeOperation='lighter';
 			}
 			ctx.fillStyle = '#' + key;
 			ctx.beginPath();
@@ -277,10 +341,10 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			for (var j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
 				if (v === null) {
 					v = data.vertices[data.polys[i].vertices[j]];
-					ctx.moveTo(v.x + data.polys[i].origin.x, v.y + data.polys[i].origin.y);
+					ctx.moveTo(v.x, v.y);
 				} else {
 					v = data.vertices[data.polys[i].vertices[j]];
-					ctx.lineTo(v.x + data.polys[i].origin.x, v.y + data.polys[i].origin.y);
+					ctx.lineTo(v.x, v.y);
 				}
 			}
 			ctx.closePath();
