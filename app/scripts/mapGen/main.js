@@ -3,6 +3,11 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	'use strict';
 	var v = new Voronoi();
 	var perlin = new Perlin(true);
+
+	function pad(n, len) {
+		return (new Array(len + 1).join('0') + n).slice(-len);
+	}
+
 	function setup () {
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
@@ -41,6 +46,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var data = {};
 		data.vertices = [];
 		data.polys = [];
+
 		var addVertex = function (vertex, cell) {
 			var inArray = data.vertices.indexOf(vertex);
 			if (inArray === -1) {
@@ -61,6 +67,9 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			data.polys[cell].origin = {};
 			data.polys[cell].origin.x = diagram.cells[cell].site.x;
 			data.polys[cell].origin.y = diagram.cells[cell].site.y;
+			data.polys[cell].area = 0;
+			data.polys[cell].areaValue = 0;
+			data.polys[cell].averageValue = 0;
 			for(var halfedge in diagram.cells[cell].halfedges) {
 				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
 				var vb = diagram.cells[cell].halfedges[halfedge].edge.vb;
@@ -96,36 +105,57 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 		})();
 
-		renderCells(canvas, ctx, data);
+		var cellKey = renderCells(canvas, ctx, data);
+
+		// Draw perlin noise over the canvas
+		function drawPerlin() {
+			for(var x = bbox.xl; x<bbox.xr; x++) {
+				for(var y = bbox.yt; y<bbox.yb; y++) {
+					var val = Math.floor(256 * getPerlin({x: x, y: y, z: 0}, -0.3, 0.3, 20),16);
+					ctx.fillStyle = 'rgb(' + val + ',' + val + ',' + val + ')';
+					ctx.fillRect(x,y,1,1);
+				}
+			}
+		}
+		//drawPerlin();
 
 		// Get the CanvasPixelArray from the given coordinates and dimensions.
 		var imgd = ctx.getImageData(bbox.xl, bbox.yt, bbox.xr - bbox.xl, bbox.yb - bbox.yt);
 		var pix = imgd.data;
 		// Loop over each pixel and invert the color.
-		for (var i = 0, l = pix.length; l < l; i += 4) {
-		    pix[i  ] = 255 - pix[i  ]; // red
-		    pix[i+1] = 255 - pix[i+1]; // green
-		    pix[i+2] = 255 - pix[i+2]; // blue
+		var n = 0;
+		for (var i = 0, l = pix.length; i < l; i += 4) {
+		    var red = pad(pix[i  ].toString(16),2);
+		    var blue = pad(pix[i+1].toString(16),2);
+		    var green = pad(pix[i+2].toString(16),2);
 		    // i+3 is alpha (the fourth element)
+		    var col = red+blue+green;
+		    //if (Math.random() < 0.01) console.log(col);
+		    var indexOfKey = cellKey.indexOf(col);
+		    if (indexOfKey !== -1) {
+				data.polys[indexOfKey].area++;
+				var x = i % (bbox.xr - bbox.xl);
+				var y = Math.floor(i / (bbox.xr - bbox.xl));
+				data.polys[indexOfKey].areaValue += getPerlin({x: x, y: y, z: 0}, -0.3, 0.3, 20);
+		    }
 		}
+
 	}
 
 	function getPerlin(point, min, max, zoom) {
 		var x = point.x;
 		var y = point.y;
 		var z = point.z;
-		(function (z) {
-			var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
-			if (noise < min) {
-				noise = min;
-			}
-			if (noise > max) {
-				noise = max;
-			}
-			noise = noise - min;
-			noise *= 1/(max - min);
-			return noise;
-		})(z++ % 100);
+		var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
+		if (noise < min) {
+			noise = min;
+		}
+		if (noise > max) {
+			noise = max;
+		}
+		noise = noise - min;
+		noise *= 1/(max - min);
+		return noise;
 	}
 
 	function relax (diagram, bbox) {
@@ -181,8 +211,11 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	}
 
 	function renderCells (canvas, ctx, cells) {
+		var cellKey = [];
 		for(var i=0,l=cells.polys.length;i<l;i++) {
-			ctx.fillStyle = '#' + Math.floor(Math.random()*16777215).toString(16);
+			var key = pad(i.toString(16),6);
+			cellKey[i] = key;
+			ctx.fillStyle = '#' + key;
 			ctx.beginPath();
 			var v = null;
 			for (var j=0,l2=cells.polys[i].vertices.length;j<l2;j++) {
@@ -195,8 +228,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				}
 			}
 			ctx.closePath();
-			ctx.rect(cells.polys[i].origin.x-2/3,cells.polys[i].origin.y-2/3,2,2);
 			ctx.fill();
 		}
+		return cellKey;
 	}
 });
