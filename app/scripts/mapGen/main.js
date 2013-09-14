@@ -3,6 +3,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	'use strict';
 	var v = new Voronoi();
 	var perlin = new Perlin(true);
+	var maxArea = 0.3;
 
 	function pad(n, len) {
 		return (new Array(len + 1).join('0') + n).slice(-len);
@@ -150,6 +151,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			totalArea += data.polys[i].area;
 			data.polys[i].areaValue /= data.polys[i].area;
 			data.polys[i].area /= totalArea;
+			console.log(data.polys[i].areaValue);
+
 		}
 
 		renderCells(canvas, ctx, data, true);
@@ -224,25 +227,37 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	}
 
 	function renderCells (canvas, ctx, cells, hasData) {
+		function cellSortFunction (a,b) {
+			return b.areaValue - a.areaValue;
+		}
+
 		var cellKey = [];
-		for(var i=0,l=cells.polys.length;i<l;i++) {
+		var areaUsed = 0;
+		var tempCells = cells.polys.sort(cellSortFunction);
+		for(var i=0,l=tempCells.length;i<l;i++) {
 			var key = pad(i.toString(16),6);
 			cellKey[i] = key;
 			if (hasData) {
-				var val = pad((256*cells.polys[i].areaValue).toString(16),2);
-				key = val + '0000';
+
+				if (areaUsed < maxArea) {
+					key = 'ff0000';
+					areaUsed += tempCells[i].area;
+				} else {
+					key = '000000';
+				}
+
 				ctx.globalCompositeOperation='lighter';
 			}
 			ctx.fillStyle = '#' + key;
 			ctx.beginPath();
 			var v = null;
-			for (var j=0,l2=cells.polys[i].vertices.length;j<l2;j++) {
+			for (var j=0,l2=tempCells[i].vertices.length;j<l2;j++) {
 				if (v === null) {
-					v = cells.vertices[cells.polys[i].vertices[j]];
-					ctx.moveTo(v.x + cells.polys[i].origin.x, v.y + cells.polys[i].origin.y);
+					v = cells.vertices[tempCells[i].vertices[j]];
+					ctx.moveTo(v.x + tempCells[i].origin.x, v.y + tempCells[i].origin.y);
 				} else {
-					v = cells.vertices[cells.polys[i].vertices[j]];
-					ctx.lineTo(v.x + cells.polys[i].origin.x, v.y + cells.polys[i].origin.y);
+					v = cells.vertices[tempCells[i].vertices[j]];
+					ctx.lineTo(v.x + tempCells[i].origin.x, v.y + tempCells[i].origin.y);
 				}
 			}
 			ctx.closePath();
