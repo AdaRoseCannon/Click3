@@ -2,7 +2,7 @@
 define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton'], function ($, Voronoi, Perlin, AnimRequest) {
 	'use strict';
 	var v = new Voronoi();
-	var perlin = new Perlin();
+	var perlin = new Perlin(true);
 	function setup () {
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
@@ -30,22 +30,28 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		render (canvas, ctx, diagram);
 
 		var z=0;
-		var total = 0;
-		var amount = 0;
-		var min = -1;
-		var max = 1;
+		var min = -0.3;
+		var max = 0.3;
+		var zoom = 20;
 		var doer = new AnimRequest('perlin', function () {
 			(function (z) {
 				ctx.beginPath();
 				for (var x = bbox.xl, y; x < bbox.xr; x++) {
 					for (y = bbox.yt; y <= bbox.yb; y++) {
 						ctx.fillStyle = '#000';
-						var noise = perlin.noise(x/100,y/100,z/100);
+						var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
+						if (noise < min) {
+							noise = min;
+						}
+						if (noise > max) {
+							noise = max;
+						}
 						noise = noise - min;
 						noise *= 1/(max - min);
-						amount++;
-						total += noise;
 						var hex = Math.floor(parseInt((0xFF).toString(10)) * noise).toString(16);
+						if(hex.length === 1){
+							hex = '0' + hex;
+						}
 						ctx.fillStyle = '#' + hex + hex + hex;
 						ctx.fillRect(x,y,1,1);
 					}
