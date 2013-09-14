@@ -19,48 +19,117 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var noPoints = 100;
 
 		var points = [];
-
-		for (var i=0; i<noPoints; i++) {
-			points[i] = {x: bbox.xr*Math.random(), y: bbox.yb*Math.random()};
-		}
+		(function () {
+			for (var i=0; i<noPoints; i++) {
+				points[i] = {x: bbox.xr*Math.random(), y: bbox.yb*Math.random()};
+			}
+		})();
 
 		var diagram = v.compute(points, bbox);
 		diagram = relax(diagram, bbox);
 		diagram = relax(diagram, bbox);
-		render (canvas, ctx, diagram);
-
-		var z=0;
-		var min = -0.3;
-		var max = 0.3;
-		var zoom = 20;
-		var doer = new AnimRequest('perlin', function () {
-			(function (z) {
-				ctx.beginPath();
-				for (var x = bbox.xl, y; x < bbox.xr; x++) {
-					for (y = bbox.yt; y <= bbox.yb; y++) {
-						ctx.fillStyle = '#000';
-						var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
-						if (noise < min) {
-							noise = min;
-						}
-						if (noise > max) {
-							noise = max;
-						}
-						noise = noise - min;
-						noise *= 1/(max - min);
-						var hex = Math.floor(parseInt((0xFF).toString(10)) * noise).toString(16);
-						if(hex.length === 1){
-							hex = '0' + hex;
-						}
-						ctx.fillStyle = '#' + hex + hex + hex;
-						ctx.fillRect(x,y,1,1);
-					}
-				}
-			})(z++ % 100);
-	    });
-	    doer.once();
+		generateCellsFromCanvas (canvas, ctx, diagram, bbox);
 	}
 	setup();
+
+	function generateCellsFromCanvas (canvas, ctx, diagram, bbox) {
+
+		//This function must seperate the new object from the old to allow garbage collection.
+
+		render (canvas, ctx, diagram);
+
+		var data = {};
+		data.vertices = [];
+		data.polys = [];
+		var addVertex = function (vertex, cell) {
+			var inArray = data.vertices.indexOf(vertex);
+			if (inArray === -1) {
+				data.polys[cell].vertices.push(data.vertices.push(vertex)-1);
+			} else {
+				var inPoly = data.polys[cell].vertices.indexOf(inArray);
+				if (inPoly === -1) {
+					data.polys[cell].vertices.push(inArray);
+				} else {
+					data.polys[cell].vertices[inPoly] = inArray;
+				}
+			}
+		};
+
+		for(var cell in diagram.cells) {
+			data.polys[cell] = {};
+			data.polys[cell].vertices = [];
+			data.polys[cell].origin = {};
+			data.polys[cell].origin.x = diagram.cells[cell].site.x;
+			data.polys[cell].origin.y = diagram.cells[cell].site.y;
+			for(var halfedge in diagram.cells[cell].halfedges) {
+				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
+				var vb = diagram.cells[cell].halfedges[halfedge].edge.vb;
+				//use JSON.stringify as a hash to check the array against
+				var vertex1 = JSON.stringify({x: va.x - data.polys[cell].origin.x, y: va.y - data.polys[cell].origin.y});
+				var vertex2 = JSON.stringify({x: vb.x - data.polys[cell].origin.x, y: vb.y - data.polys[cell].origin.y});
+				addVertex(vertex1, cell);
+				addVertex(vertex2, cell);
+			}
+		}
+
+		//convert the JSon.strinigify back to vertices.
+		(function () {
+			for(var i=0,l=data.vertices.length;i<l;i++) {
+				data.vertices[i] = JSON.parse(data.vertices[i]);
+			}
+		})();
+
+		//Sort the cell vertices so that they are anticlockwise;
+		(function () {
+			function sortCell (cell) {
+				var tempCell = [];
+				for(var vert in cell.vertices) {
+					tempCell[vert] = data.vertices[cell.vertices[vert]];
+				}
+				tempCell = tempCell.sort(function (a,b) {
+					//convert cartesian coordinates to polar
+					var angleA = Math.atan2(a.y,a.x);
+					var angleB = Math.atan2(b.y,b.x);
+					console.log(angleB);
+					return  angleA - angleB;
+				});
+			}
+			for(var cell in data.polys) {
+				sortCell(data.polys[cell]);
+			}
+		})();
+
+		renderCells(canvas, ctx, data);
+
+		// Get the CanvasPixelArray from the given coordinates and dimensions.
+		var imgd = ctx.getImageData(bbox.xl, bbox.yt, bbox.xr - bbox.xl, bbox.yb - bbox.yt);
+		var pix = imgd.data;
+		// Loop over each pixel and invert the color.
+		for (var i = 0, l = pix.length; l < l; i += 4) {
+		    pix[i  ] = 255 - pix[i  ]; // red
+		    pix[i+1] = 255 - pix[i+1]; // green
+		    pix[i+2] = 255 - pix[i+2]; // blue
+		    // i+3 is alpha (the fourth element)
+		}
+	}
+
+	function getPerlin(point, min, max, zoom) {
+		var x = point.x;
+		var y = point.y;
+		var z = point.z;
+		(function (z) {
+			var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
+			if (noise < min) {
+				noise = min;
+			}
+			if (noise > max) {
+				noise = max;
+			}
+			noise = noise - min;
+			noise *= 1/(max - min);
+			return noise;
+		})(z++ % 100);
+	}
 
 	function relax (diagram, bbox) {
 		var points = [];
@@ -112,5 +181,24 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		}
 		ctx.fill();
 
+	}
+
+	function renderCells (canvas, ctx, cells) {
+		for(var i=0,l=cells.polys.length;i<l;i++) {
+			ctx.fillStyle = '#' + Math.floor(Math.random()*16777215).toString(16);
+			ctx.beginPath();
+			var v = null;
+			for (var j=0,l2=cells.polys[i].vertices.length;j<l2;j++) {
+				if (v === null) {
+					v = cells.vertices[cells.polys[i].vertices[j]];
+					ctx.moveTo(v.x + cells.polys[i].origin.x, v.y + cells.polys[i].origin.y);
+				} else {
+					v = cells.vertices[cells.polys[i].vertices[j]];
+					ctx.lineTo(v.x + cells.polys[i].origin.x, v.y + cells.polys[i].origin.y);
+				}
+			}
+			ctx.closePath();
+			ctx.fill();
+		}
 	}
 });
