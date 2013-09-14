@@ -46,7 +46,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		var data = {};
 		data.vertices = [];
-		data.edgeVertices = [];
 		data.polys = [];
 
 		var addVertex = function (vertex, cell) {
@@ -55,11 +54,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			if (inArray === -1) {
 				var newVertexIndex = data.vertices.push(vertex)-1;
 				data.polys[cell].vertices.push(newVertexIndex);
-				if(vertexObject.x === 0 || vertexObject.y === 0) {
-					data.edgeVertices.push(newVertexIndex);
-					return true;
-				}
-				return false;
 			} else {
 				var inPoly = data.polys[cell].vertices.indexOf(inArray);
 				if (inPoly === -1) {
@@ -67,10 +61,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				} else {
 					data.polys[cell].vertices[inPoly] = inArray;
 				}
-				if(data.edgeVertices.indexOf(inArray)) {
-					return true;
-				}
-				return false;
 			}
 		};
 
@@ -91,11 +81,17 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				//use JSON.stringify as a hash to check the array against
 				var vertex1 = JSON.stringify({x: va.x - data.polys[cell].origin.x, y: va.y - data.polys[cell].origin.y});
 				var vertex2 = JSON.stringify({x: vb.x - data.polys[cell].origin.x, y: vb.y - data.polys[cell].origin.y});
-				edgeVertex = addVertex(vertex1, cell);
-				edgeVertex = addVertex(vertex2, cell) || edgeVertex;
+				addVertex(vertex1, cell);
+				addVertex(vertex2, cell);
+				if (va.x === bbox.xl || va.x === bbox.xr || va.y === bbox.yt || va.y === bbox.yb) {
+					edgeVertex = true;
+				}
+				if (vb.x === bbox.xl || vb.x === bbox.xr || vb.y === bbox.yt || vb.y === bbox.yb) {
+					edgeVertex = true;
+				}
 			}
 			if (edgeVertex) {
-				data.polys[cell].land = false;
+				data.polys[cell].land = 'forcedOcean';
 			}
 		}
 
@@ -149,7 +145,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		    var green = pad(pix[i+2].toString(16),2);
 		    // i+3 is alpha (the fourth element)
 		    var col = red+blue+green;
-		    //if (Math.random() < 0.01) console.log(col);
 		    var indexOfKey = cellKey.indexOf(col);
 		    if (indexOfKey !== -1) {
 				totalArea++;
@@ -176,11 +171,20 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			totalArea += data.polys[i].area;
 			data.polys[i].areaValue /= data.polys[i].area;
 			data.polys[i].area /= totalArea;
-
-			if (data.polys[i].land === null && areaUsed < maxArea) {
-				data.polys[i].land = true;
-				areaUsed += data.polys[i].area;
+			if (areaUsed < maxArea) {
+				if(data.polys[i].land === null) {
+					data.polys[i].land = 'land';
+					areaUsed += data.polys[i].area;
+				}
 			}
+
+
+			//calculateAdjacent using delaunay traingles
+
+			
+
+			//flood oceans in from corner
+
 		}
 
 		renderCells(canvas, ctx, data, true);
@@ -251,7 +255,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			ctx.rect(vertex.x-2/3,vertex.y-2/3,2,2);
 		}
 		ctx.fill();
-
 	}
 
 	function renderCells (canvas, ctx, data, hasData) {
@@ -261,7 +264,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			var key = pad(i.toString(16),6);
 			cellKey[i] = key;
 			if (hasData) {
-				if (data.polys[i].land) {
+				if (data.polys[i].land === 'land') {
 					key = 'ff0000';
 				} else {
 					key = '000000';
