@@ -9,6 +9,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		return (new Array(len + 1).join('0') + n).slice(-len);
 	}
 	function setup () {
+		console.time('mapGen');
 		var wrapper = document.createElement('div');
 		wrapper.innerHTML = '<div class="container" id="mapGen">\
 			<h1>Map Generator</h1>\
@@ -42,6 +43,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//This function must seperate the new object from the old to allow garbage collection.
 
 		render (canvas, ctx, diagram);
+
+		var reverseVertexMap = [];
 
 		var data = {};
 		data.vertices = [];
@@ -121,8 +124,26 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				data.polys[cell].vertices = sortCell(data.polys[cell]);
 				var vertices = data.polys[cell].vertices;
 				for(var v=0,l=vertices.length; v<l; v++) {
-					var edge1 = JSON.stringify({a: vertices[v], b:vertices[((v-1) + l)%l]});
-					var edge2 = JSON.stringify({a:vertices[((v-1) + l)%l], b: vertices[v]});
+
+					var v1 = vertices[v];
+					var v2 = vertices[((v-1) + l)%l];
+
+					var edge1 = JSON.stringify({a: v1, b: v2});
+					var edge2 = JSON.stringify({a: v2, b: v1});
+
+					if(data.vertices[v1].adjacent === undefined) {
+						data.vertices[v1].adjacent = [];
+					}
+					if(data.vertices[v1].adjacent.indexOf(v2) === -1) {
+						data.vertices[v1].adjacent.push(v2);
+					}
+					if(data.vertices[v2].adjacent === undefined) {
+						data.vertices[v2].adjacent = [];
+					}
+					if(data.vertices[v2].adjacent.indexOf(v1) === -1) {
+						data.vertices[v2].adjacent.push(v1);
+					}
+
 					var useEdge;
 					var search1 = data.edges.indexOf(edge1);
 					var search2 = data.edges.indexOf(edge2);
@@ -259,18 +280,58 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		//flood oceans in from corner
 		function recursiveFlood(seed) {
-			seed.land = 'ocean';
+			if (seed.land === 'forcedWater') {
+				seed.land = 'forcedOcean';
+			} else {
+				seed.land = 'ocean';
+			}
 			for (var key in seed.adjacent) {
 				var next = data.polys[seed.adjacent[key]];
-				if (next.land !== 'land' && next.land !== 'ocean') {
+				if (next.land !== 'land' && next.land !== 'ocean' && next.land !== 'forcedOcean') {
 					recursiveFlood(next);
 				}
 			}
 		}
 		recursiveFlood(oceanSeed);
 
-		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+"kB");
+		//create reverse look up map for vertices.
+		for(i=0,l=data.polys.length;i<l;i++) {
+			var vertices = data.polys[i].vertices;
+			for (var v=0, l2=vertices.length; v<l2; v++) {
+				//construct vertex lookup object
+				if (reverseVertexMap[vertices[v]] === undefined) {
+					reverseVertexMap[vertices[v]] = [];
+				}
+				if (reverseVertexMap[vertices[v]].indexOf(data.polys[i].index) === -1) {
+					reverseVertexMap[vertices[v]].push(data.polys[i].index);
+				}
+			}
+		}
+
+		function calculateDistanceToOcean (vSet, distanceTravelled) {
+			var contactingOcean = false;
+			for (var cell in reverseVertexMap[vSet]){
+				var land = data.polys[reverseVertexMap[vSet][cell]].land;
+				if (land === 'ocean' || land === 'forcedOcean') {
+					contactingOcean = true;
+				}
+			}
+			data.vertices[vSet].distanceToOcean = 0;
+			for(var k in data.vertices[vSet].adjacent) {
+				data.vertices[data.vertices[vSet].adjacent[k]].distanceToOcean = 1;
+			}
+
+		}
+		calculateDistanceToOcean (20,0);
+		/*
+		for(var k in data.vertices) {
+			calculateDistanceToOcean (k,0);
+		}
+		*/
+		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
+		console.log(data);
 		renderCells(canvas, ctx, data, true);
+		console.timeEnd('mapGen');
 	}
 
 	function getPerlin(point, min, max, zoom) {
@@ -357,6 +418,9 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				case 'ocean':
 					key = '000066';
 					break;
+				case 'forcedOcean':
+					key = '000055';
+					break;
 				default:
 					key = '000000';
 				}
@@ -376,6 +440,16 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 			ctx.closePath();
 			ctx.fill();
+			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
+				v = data.vertices[data.polys[i].vertices[j]];
+				if (v.distanceToOcean !== undefined) {
+					var newCol = '#' + pad((255-(v.distanceToOcean*50)).toString(16),2) + '0000';
+					console.log(newCol);
+					ctx.fillStyle = newCol;
+					ctx.fillRect(v.x-3, v.y-3, 6,6);
+				}
+			}
+
 		}
 		ctx.globalCompositeOperation='source-over';
 		return cellKey;
