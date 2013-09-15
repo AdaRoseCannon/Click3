@@ -58,10 +58,10 @@ function hideHud() {
     });
 }
 
-function startApp() {
+window['startApp'] = function() {
 	'use strict';
     hideHud();
-    require(['scene', 'libs/store'], function (elem, Store) {
+    require(['scene', 'libs/store', 'bindings'], function (elem, Store, bindings) {
         var render = (new Store()).data.render;
         $('body').append(elem);
         render.set('actualDimensions', {width: elem.clientWidth, height: elem.clientHeight});
@@ -72,14 +72,14 @@ function startApp() {
         } else if (elem.webkitRequestFullscreen) {
             elem.webkitRequestFullscreen();
         }
-        require(['bindings']);
+        bindings();
     });
-}
+};
 
-function mapGen() {
+window['mapGen'] = function() {
 	'use strict';
     hideHud();
     require(['mapGen/main']);
-}
+};
 
 //mapGen();
