@@ -109,6 +109,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		//Sort the cell vertices so that they are anticlockwise;
 		(function () {
+
 			function sortCell (cell) {
 				var origin = cell.origin;
 				return cell.vertices.sort(function (aIn,bIn) {
@@ -122,50 +123,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 			for(var cell in data.polys) {
 				data.polys[cell].vertices = sortCell(data.polys[cell]);
-				var vertices = data.polys[cell].vertices;
-				for(var v=0,l=vertices.length; v<l; v++) {
-
-					var v1 = vertices[v];
-					var v2 = vertices[((v-1) + l)%l];
-
-					var edge1 = JSON.stringify({a: v1, b: v2});
-					var edge2 = JSON.stringify({a: v2, b: v1});
-
-					if(data.vertices[v1].adjacent === undefined) {
-						data.vertices[v1].adjacent = [];
-					}
-					if(data.vertices[v1].adjacent.indexOf(v2) === -1) {
-						data.vertices[v1].adjacent.push(v2);
-					}
-					if(data.vertices[v2].adjacent === undefined) {
-						data.vertices[v2].adjacent = [];
-					}
-					if(data.vertices[v2].adjacent.indexOf(v1) === -1) {
-						data.vertices[v2].adjacent.push(v1);
-					}
-
-					var useEdge;
-					var search1 = data.edges.indexOf(edge1);
-					var search2 = data.edges.indexOf(edge2);
-					if (search1 === -1) {
-						if (search2 === -1) {
-							useEdge = data.edges.push(edge1) - 1;
-						} else {
-							useEdge = search2;
-						}
-					} else {
-						useEdge = search1;
-					}
-					data.polys[cell].edges.push(useEdge);
-				}
 			}
-
-			//convert edges to objects
-			(function () {
-				for(var i=0,l=data.edges.length;i<l;i++) {
-					data.edges[i] = JSON.parse(data.edges[i]);
-				}
-			})();
 		})();
 
 		var cellKey = renderCells(canvas, ctx, data);
@@ -267,6 +225,69 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		}
 
+		//Generate Edges
+
+		(function () {
+			var tempAdjacentData = [];
+			for(var cell in data.polys) {
+				var vertices = data.polys[cell].vertices;
+
+				//Loop around a cell saving all of the edges.
+				for(var v=0,l=vertices.length; v<l; v++) {
+
+					var v1 = vertices[v];
+					var v2 = vertices[((v-1) + l)%l];
+
+					var edge1 = JSON.stringify({a: v1, b: v2});
+					var edge2 = JSON.stringify({a: v2, b: v1});
+
+					if(data.vertices[v1].adjacent === undefined) {
+						data.vertices[v1].adjacent = [];
+					}
+					if(data.vertices[v1].adjacent.indexOf(v2) === -1) {
+						data.vertices[v1].adjacent.push(v2);
+					}
+					if(data.vertices[v2].adjacent === undefined) {
+						data.vertices[v2].adjacent = [];
+					}
+					if(data.vertices[v2].adjacent.indexOf(v1) === -1) {
+						data.vertices[v2].adjacent.push(v1);
+					}
+
+					//See if the edge is already present 
+					//(it can be in either directio)
+					var useEdge;
+					var search1 = data.edges.indexOf(edge1);
+					var search2 = data.edges.indexOf(edge2);
+					if (search1 === -1) {
+						if (search2 === -1) {
+							useEdge = data.edges.push(edge1) - 1;
+							//if neither direction is in the object then add one of them.
+						} else {
+							useEdge = search2;
+						}
+					} else {
+						useEdge = search1;
+					}
+					data.polys[cell].edges.push(useEdge);
+
+					//assign cells to each edge.
+					if (tempAdjacentData[useEdge] === undefined) {
+						tempAdjacentData[useEdge] = [];
+					}
+					tempAdjacentData[useEdge].push(cell);
+				}
+			}
+
+			//convert edges to objects
+			(function () {
+				for(var i=0,l=data.edges.length;i<l;i++) {
+					data.edges[i] = JSON.parse(data.edges[i]);
+					data.edges[i].polys = tempAdjacentData[i];
+				}
+			})();
+		})();
+
 		//create delaunay traingles adjacentiness
 		for(i=0,l=data.polys.length;i<l;i++) {
 			for(var j=0;j<l;j++) {
@@ -313,7 +334,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			for(var vSet in data.vertices) {
 				if (pass === 0) {
 					var contactingOcean = false;
-					console.log(data.vertices[vSet].polys);
 					for (var cell in data.vertices[vSet].polys){
 						var land = data.polys[data.vertices[vSet].polys[cell]].land;
 						if (land === 'ocean' || land === 'forcedOcean') {
@@ -345,8 +365,18 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//Determine coatlines beaches or cliffs.
 		//If they are adjacent to cut off cells then they are cliffs.
 
-
-
+		for (var edge in data.edges){
+			if(data.edges[edge].polys.length === 2) {
+				console.log(data.vertices[data.edges[edge].a].distanceToOcean);
+				if(data.vertices[data.edges[edge].a].distanceToOcean === 0) {
+					if(data.vertices[data.edges[edge].b].distanceToOcean === 0) {
+						if(data.polys[data.edges[edge].polys[0]].land === 'land' || data.polys[data.edges[edge].polys[1]].land === 'land') {
+							data.edges[edge].type = 'beach';
+						}
+					}
+				}
+			}
+		}
 
 		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
 		console.log(data);
@@ -463,12 +493,40 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
 				v = data.vertices[data.polys[i].vertices[j]];
 				if (v.distanceToOcean !== undefined) {
-					var newCol = '#' + pad((255-(v.distanceToOcean*32)).toString(16),2) + '0000';
+					var newCol = '#' + pad((255-(v.distanceToOcean*64)).toString(16),2) + '0000';
 					ctx.fillStyle = newCol;
 					ctx.fillRect(v.x-3, v.y-3, 6,6);
 				}
 			}
-
+		}
+		for (var k=0,l3=data.edges.length;k<l3;k++) {
+			if(data.edges[k].type !== undefined) {
+				switch (data.edges[k].type) {
+				case 'beach':
+					var v1 = data.vertices[data.edges[k].a];
+					var v2 = data.vertices[data.edges[k].b];
+					var c1 = data.polys[data.edges[k].polys[0]].origin;
+					var c2 = data.polys[data.edges[k].polys[1]].origin;
+					if (data.polys[data.edges[k].polys[0]].land === 'land') {
+						ctx.fillStyle = '#00FF00';
+					} else {
+						ctx.fillStyle = '#4466FF';
+					}
+					ctx.fillRect(c1.x-4, c1.y-4, 8,8);
+					if (data.polys[data.edges[k].polys[1]].land === 'land') {
+						ctx.fillStyle = '#00FF00';
+					} else {
+						ctx.fillStyle = '#4466FF';
+					}
+					ctx.fillRect(c2.x-4, c2.y-4, 8,8);
+					ctx.moveTo(v1.x, v1.y);
+					ctx.lineTo(v2.x, v2.y);
+					ctx.lineWidth=5;
+					ctx.strokeStyle='#FFFF00';
+					ctx.stroke();
+					break;
+				}
+			}
 		}
 		ctx.globalCompositeOperation='source-over';
 		return cellKey;
