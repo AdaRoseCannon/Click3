@@ -46,6 +46,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var data = {};
 		data.vertices = [];
 		data.polys = [];
+		data.edges = [];
 
 		var addVertex = function (vertex, cell) {
 			var inArray = data.vertices.indexOf(vertex);
@@ -66,13 +67,13 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		for(var cell in diagram.cells) {
 			data.polys[cell] = {};
 			data.polys[cell].vertices = [];
+			data.polys[cell].edges = [];
 			data.polys[cell].adjacent = [];
 			data.polys[cell].origin = {};
 			data.polys[cell].origin.x = diagram.cells[cell].site.x;
 			data.polys[cell].origin.y = diagram.cells[cell].site.y;
 			data.polys[cell].area = 0;
 			data.polys[cell].areaValue = 0;
-			data.polys[cell].averageValue = 0;
 			data.polys[cell].land = null;
 			var edgeVertex = false;
 			for(var halfedge in diagram.cells[cell].halfedges) {
@@ -118,7 +119,32 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 			for(var cell in data.polys) {
 				data.polys[cell].vertices = sortCell(data.polys[cell]);
+				var vertices = data.polys[cell].vertices;
+				for(var v=0,l=vertices.length; v<l; v++) {
+					var edge1 = JSON.stringify({a: vertices[v], b:vertices[((v-1) + l)%l]});
+					var edge2 = JSON.stringify({a:vertices[((v-1) + l)%l], b: vertices[v]});
+					var useEdge;
+					var search1 = data.edges.indexOf(edge1);
+					var search2 = data.edges.indexOf(edge2);
+					if (search1 === -1) {
+						if (search2 === -1) {
+							useEdge = data.edges.push(edge1) - 1;
+						} else {
+							useEdge = search2;
+						}
+					} else {
+						useEdge = search1;
+					}
+					data.polys[cell].edges.push(useEdge);
+				}
 			}
+
+			//convert edges to objects
+			(function () {
+				for(var i=0,l=data.edges.length;i<l;i++) {
+					data.edges[i] = JSON.parse(data.edges[i]);
+				}
+			})();
 		})();
 
 		var cellKey = renderCells(canvas, ctx, data);
@@ -180,7 +206,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				var result = b.vertices.indexOf(a.vertices[v]);
 
 				if (result >= 0) {
-					if (b.vertices.indexOf(a.vertices[(v - 1) % l]) !== -1) {
+					if (b.vertices.indexOf(a.vertices[((v - 1) + l) % l]) !== -1) {
 						a.adjacent.push(b.index);
 						b.adjacent.push(a.index);
 						return true;
@@ -243,6 +269,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		}
 		recursiveFlood(oceanSeed);
 
+		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+"kB");
 		renderCells(canvas, ctx, data, true);
 	}
 
