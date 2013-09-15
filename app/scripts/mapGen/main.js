@@ -299,35 +299,55 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			var vertices = data.polys[i].vertices;
 			for (var v=0, l2=vertices.length; v<l2; v++) {
 				//construct vertex lookup object
-				if (reverseVertexMap[vertices[v]] === undefined) {
-					reverseVertexMap[vertices[v]] = [];
-				}
-				if (reverseVertexMap[vertices[v]].indexOf(data.polys[i].index) === -1) {
-					reverseVertexMap[vertices[v]].push(data.polys[i].index);
+				if (data.vertices[vertices[v]].polys === undefined) {
+					data.vertices[vertices[v]].polys = [data.polys[i].index];
+				} else {
+					if (data.vertices[vertices[v]].polys.indexOf(data.polys[i].index) === -1) {
+						data.vertices[vertices[v]].polys.push(data.polys[i].index);
+					}
 				}
 			}
 		}
 
-		function calculateDistanceToOcean (vSet, distanceTravelled) {
-			var contactingOcean = false;
-			for (var cell in reverseVertexMap[vSet]){
-				var land = data.polys[reverseVertexMap[vSet][cell]].land;
-				if (land === 'ocean' || land === 'forcedOcean') {
-					contactingOcean = true;
+		function calculateDistanceToOcean (pass) {
+			for(var vSet in data.vertices) {
+				if (pass === 0) {
+					var contactingOcean = false;
+					console.log(data.vertices[vSet].polys);
+					for (var cell in data.vertices[vSet].polys){
+						var land = data.polys[data.vertices[vSet].polys[cell]].land;
+						if (land === 'ocean' || land === 'forcedOcean') {
+							contactingOcean = true;
+						}
+					}
+					if (contactingOcean) {
+						data.vertices[vSet].distanceToOcean = 0;
+					}
+				} else {
+					if (data.vertices[vSet].distanceToOcean === undefined) {
+						for (var adj in data.vertices[vSet].adjacent) {
+							if (data.vertices[data.vertices[vSet].adjacent[adj]].distanceToOcean === pass - 1) {
+								data.vertices[vSet].distanceToOcean = pass;
+								break;
+							}
+						}
+					}
 				}
 			}
-			data.vertices[vSet].distanceToOcean = 0;
-			for(var k in data.vertices[vSet].adjacent) {
-				data.vertices[data.vertices[vSet].adjacent[k]].distanceToOcean = 1;
-			}
+		}
+		calculateDistanceToOcean (0);
+		calculateDistanceToOcean (1);
+		calculateDistanceToOcean (2);
+		calculateDistanceToOcean (3);
+		calculateDistanceToOcean (4);
+		calculateDistanceToOcean (5);
 
-		}
-		calculateDistanceToOcean (20,0);
-		/*
-		for(var k in data.vertices) {
-			calculateDistanceToOcean (k,0);
-		}
-		*/
+		//Determine coatlines beaches or cliffs.
+		//If they are adjacent to cut off cells then they are cliffs.
+
+
+
+
 		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
 		console.log(data);
 		renderCells(canvas, ctx, data, true);
@@ -443,8 +463,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
 				v = data.vertices[data.polys[i].vertices[j]];
 				if (v.distanceToOcean !== undefined) {
-					var newCol = '#' + pad((255-(v.distanceToOcean*50)).toString(16),2) + '0000';
-					console.log(newCol);
+					var newCol = '#' + pad((255-(v.distanceToOcean*32)).toString(16),2) + '0000';
 					ctx.fillStyle = newCol;
 					ctx.fillRect(v.x-3, v.y-3, 6,6);
 				}
