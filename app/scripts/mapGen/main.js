@@ -322,7 +322,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			if (hasData) {
 				switch (data.polys[i].land) {
 				case 'land':
-					key = 'ff0000';
+					key = '668855';
 					break;
 				case 'lake':
 					key = '00ffff';

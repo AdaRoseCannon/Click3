@@ -82,4 +82,4 @@ function mapGen() {
     require(['mapGen/main']);
 }
 
-mapGen();
+//mapGen();
