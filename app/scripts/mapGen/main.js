@@ -361,6 +361,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		calculateDistanceToOcean (3);
 		calculateDistanceToOcean (4);
 		calculateDistanceToOcean (5);
+		calculateDistanceToOcean (6);
+		calculateDistanceToOcean (7);
 
 		//Determine coatlines beaches or cliffs.
 		//If they are adjacent to cut off cells then they are cliffs.
@@ -561,8 +563,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
 		var renderer = new THREE.WebGLRenderer();
 		renderer.setSize(WIDTH, HEIGHT);
-	    camera.position = {x: 300, y:300, z:600};
-	    camera.lookAt({x: 200, y: 0, z: 200});
+	    camera.position = {x: 100, y:300, z:400};
+	    camera.lookAt({x: 0, y: 0, z: 0});
 	    var pointLight = new THREE.PointLight(0xFFFFFF);
 	    pointLight.position = {x: 10, y: 500, z: 130};
 
@@ -579,7 +581,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		(function () {
 			for(var v in data.vertices) {
 				var v3 = data.vertices[v];
-				islandGeometry.vertices.push(new THREE.Vector3(v3.x, v3.z, v3.y));
+				islandGeometry.vertices.push(new THREE.Vector3(v3.x-200, v3.z, v3.y-200));
 			}
 		})();
 		var Uv1 = 0.5, Uv = 0.3;
@@ -607,6 +609,10 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var island = new THREE.Object3D();
 		island.add(islandObject);
 		scene.add(island);
-		renderer.render(scene, camera);
+		var doer = new AnimRequest('renderloop', function () {
+			renderer.render(scene, camera);
+			island.rotation.y += 0.01;
+		});
+		doer.start();
 	}
 });
