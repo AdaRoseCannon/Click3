@@ -561,7 +561,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
 		var renderer = new THREE.WebGLRenderer();
 		renderer.setSize(WIDTH, HEIGHT);
-	    camera.position = {x: 200, y:600, z:200};
+	    camera.position = {x: 300, y:300, z:600};
 	    camera.lookAt({x: 200, y: 0, z: 200});
 	    var pointLight = new THREE.PointLight(0xFFFFFF);
 	    pointLight.position = {x: 10, y: 500, z: 130};
@@ -589,10 +589,11 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 					continue;
 				}
 				var f4 = data.polys[f].vertices;
-				for (var a=0, l=f4.length; a<l-2;a++) {
-					var p1 = a;
-					var p2 = (a + 1) % l;
-					var p3 = (a + 2) % l;
+				//all edges are convex so naively doing this is fine
+				for (var a=0, l=f4.length; a<l-1;a++) {
+					var p1 = 0;
+					var p2 = a;
+					var p3 = (a + 1) % l;
 					islandGeometry.faces.push(new THREE.Face3(f4[p3], f4[p2], f4[p1]));
 				}
 			}
