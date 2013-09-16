@@ -35,7 +35,7 @@ body {
     background: url('/images/tree_bark/tree_bark.png');
 }
 
-body > canvas {
+body > canvas.fullScreen {
     width: 100%;
     height:auto;
     background-color:black;

@@ -1,5 +1,5 @@
-/* globals define, $*/
-define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton'], function ($, Voronoi, Perlin, AnimRequest) {
+/* globals define, $, THREE*/
+define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton', 'three'], function ($, Voronoi, Perlin, AnimRequest, three) {
 	'use strict';
 	var v = new Voronoi();
 	var perlin = new Perlin(true);
@@ -364,24 +364,42 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 
 		//Determine coatlines beaches or cliffs.
 		//If they are adjacent to cut off cells then they are cliffs.
-
-		for (var edge in data.edges){
-			if(data.edges[edge].polys.length === 2) {
-				console.log(data.vertices[data.edges[edge].a].distanceToOcean);
-				if(data.vertices[data.edges[edge].a].distanceToOcean === 0) {
-					if(data.vertices[data.edges[edge].b].distanceToOcean === 0) {
-						if(data.polys[data.edges[edge].polys[0]].land === 'land' || data.polys[data.edges[edge].polys[1]].land === 'land') {
-							data.edges[edge].type = 'beach';
+		(function () {
+			for (var edge in data.edges){
+				if(data.edges[edge].polys.length === 2) {
+					if(data.vertices[data.edges[edge].a].distanceToOcean === 0) {
+						if(data.vertices[data.edges[edge].b].distanceToOcean === 0) {
+							for (var e=0; e<2;e++){
+								if(data.edges[edge].type === undefined) {
+									var f = (e + 1)%2;
+									var land1 = data.polys[data.edges[edge].polys[f]].land;
+									var land2 = data.polys[data.edges[edge].polys[e]].land;
+									if(land1 === 'land' && land2 === 'forcedOcean') {
+										data.edges[edge].type = 'cliffs';
+									}
+									if(land1 === 'land' && land2 === 'ocean') {
+										data.edges[edge].type = 'beach';
+									}
+								}
+							}
 						}
 					}
 				}
 			}
-		}
+		})();
+
+		//Calculate heights
+		(function () {
+			for(var v in data.vertices) {
+				data.vertices[v].z = data.vertices[v].distanceToOcean * 10;
+			}
+		})();
 
 		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
 		console.log(data);
 		renderCells(canvas, ctx, data, true);
 		console.timeEnd('mapGen');
+		render3D(canvas, ctx, data);
 	}
 
 	function getPerlin(point, min, max, zoom) {
@@ -492,7 +510,7 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			ctx.fill();
 			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
 				v = data.vertices[data.polys[i].vertices[j]];
-				if (v.distanceToOcean !== undefined) {
+				if (v.distanceToOcean) {
 					var newCol = '#' + pad((255-(v.distanceToOcean*64)).toString(16),2) + '0000';
 					ctx.fillStyle = newCol;
 					ctx.fillRect(v.x-3, v.y-3, 6,6);
@@ -501,34 +519,108 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		}
 		for (var k=0,l3=data.edges.length;k<l3;k++) {
 			if(data.edges[k].type !== undefined) {
+				var v1 = data.vertices[data.edges[k].a];
+				var v2 = data.vertices[data.edges[k].b];
+				ctx.beginPath();
+				ctx.moveTo(v1.x, v1.y);
+				ctx.lineTo(v2.x, v2.y);
 				switch (data.edges[k].type) {
 				case 'beach':
-					var v1 = data.vertices[data.edges[k].a];
-					var v2 = data.vertices[data.edges[k].b];
-					var c1 = data.polys[data.edges[k].polys[0]].origin;
-					var c2 = data.polys[data.edges[k].polys[1]].origin;
-					if (data.polys[data.edges[k].polys[0]].land === 'land') {
-						ctx.fillStyle = '#00FF00';
-					} else {
-						ctx.fillStyle = '#4466FF';
-					}
-					ctx.fillRect(c1.x-4, c1.y-4, 8,8);
-					if (data.polys[data.edges[k].polys[1]].land === 'land') {
-						ctx.fillStyle = '#00FF00';
-					} else {
-						ctx.fillStyle = '#4466FF';
-					}
-					ctx.fillRect(c2.x-4, c2.y-4, 8,8);
-					ctx.moveTo(v1.x, v1.y);
-					ctx.lineTo(v2.x, v2.y);
 					ctx.lineWidth=5;
 					ctx.strokeStyle='#FFFF00';
-					ctx.stroke();
+					break;
+				case 'cliffs':
+					ctx.lineWidth=4;
+					ctx.strokeStyle='#333333';
 					break;
 				}
+				ctx.stroke();
 			}
 		}
 		ctx.globalCompositeOperation='source-over';
 		return cellKey;
+	}
+
+	function render3D(canvas, ctx, data){
+		function addObject(obj) {
+			for (var key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					scene.add(obj[key]);
+					sceneObjects.push(obj[key]);
+				}
+			}
+		}
+		var scene = new THREE.Scene();
+		var WIDTH = 400;
+		var HEIGHT = 400;
+		var VIEW_ANGLE = 45;
+		var ASPECT = WIDTH / HEIGHT;
+		var NEAR = 0.1;
+		var FAR = 10000;
+		var sceneObjects = [];
+		var camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+		var renderer = new THREE.WebGLRenderer();
+		renderer.setSize(WIDTH, HEIGHT);
+	    camera.position = {x: 200, y:-500, z:200};
+	    camera.lookAt({x: 200, y: 0, z: 200});
+	    var pointLight = new THREE.PointLight(0xFFFFFF);
+	    pointLight.position = {x: 10, y: 500, z: 130};
+
+		// add to the scene
+		addObject({
+			camera: camera,
+			light: pointLight
+		});
+        $('div.bs').append(renderer.domElement);
+
+        //build 3d island
+
+		var islandGeometry = new THREE.Geometry();
+		(function () {
+			for(var v in data.vertices) {
+				var v3 = data.vertices[v];
+				islandGeometry.vertices.push(new THREE.Vector3(v3.x, v3.z, v3.y));
+			}
+		})();
+		var Uv1 = 0.5, Uv = 0.3;
+		(function () {
+			for(var f in data.polys) {
+				var f4 = data.polys[f].vertices;
+				switch(f4.length){
+				case 4:
+					islandGeometry.faces.push(new THREE.Face4(f4[0], f4[1], f4[2], f4[3]));
+					break;
+				case 5:
+					islandGeometry.faces.push(new THREE.Face4(f4[0], f4[1], f4[2], f4[3]));
+					islandGeometry.faces.push(new THREE.Face3(f4[2], f4[3], f4[4]));
+					break;
+				case 6:
+					islandGeometry.faces.push(new THREE.Face4(f4[0], f4[1], f4[2], f4[3]));
+					islandGeometry.faces.push(new THREE.Face4(f4[2], f4[3], f4[4], f4[5]));
+					break;
+				case 7:
+					islandGeometry.faces.push(new THREE.Face4(f4[0], f4[1], f4[2], f4[3]));
+					islandGeometry.faces.push(new THREE.Face4(f4[2], f4[3], f4[4], f4[5]));
+					islandGeometry.faces.push(new THREE.Face3(f4[4], f4[5], f4[6]));
+					break;
+				case 8:
+					islandGeometry.faces.push(new THREE.Face4(f4[0], f4[1], f4[2], f4[3]));
+					islandGeometry.faces.push(new THREE.Face4(f4[2], f4[3], f4[4], f4[5]));
+					islandGeometry.faces.push(new THREE.Face4(f4[4], f4[5], f4[6], f4[7]));
+					break;
+				}
+			}
+		})();
+		islandGeometry.computeCentroids();
+		islandGeometry.computeFaceNormals();
+		var material = new THREE.MeshLambertMaterial({
+				color:  0xFF00CC,
+				overdraw: true
+			});
+		var islandObject = new THREE.Mesh(islandGeometry, material);
+		var island = new THREE.Object3D();
+		island.add(islandObject);
+		scene.add(island);
+		renderer.render(scene, camera);
 	}
 });

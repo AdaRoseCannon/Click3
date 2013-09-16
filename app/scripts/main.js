@@ -64,6 +64,7 @@ window['startApp'] = function() {
     require(['scene', 'libs/store', 'bindings'], function (elem, Store, bindings) {
         var render = (new Store()).data.render;
         $('body').append(elem);
+        elem.classList.add('fullScreen');
         render.set('actualDimensions', {width: elem.clientWidth, height: elem.clientHeight});
         if (elem.requestFullscreen) {
             elem.requestFullscreen();
