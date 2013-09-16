@@ -397,6 +397,22 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 		})();
 
+		for (var k=0,l3=data.edges.length;k<l3;k++) {
+			if(data.edges[k].type !== undefined) {
+				switch (data.edges[k].type) {
+				case 'beach':
+					data.vertices[data.edges[k].a].z = 0;
+					data.vertices[data.edges[k].b].z = 0;
+					break;
+				case 'cliffs':
+					data.vertices[data.edges[k].a].z = 20;
+					data.vertices[data.edges[k].b].z = 20;
+					break;
+				}
+				ctx.stroke();
+			}
+		}
+
 		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
 		console.log(data);
 		renderCells(canvas, ctx, data, true);
@@ -584,26 +600,40 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				islandGeometry.vertices.push(new THREE.Vector3(v3.x-200, v3.z, v3.y-200));
 			}
 		})();
+
 		var Uv1 = 0.5, Uv = 0.3;
 		(function () {
 			for(var f in data.polys) {
-				if(data.polys[f].land !== 'land'){
-					continue;
-				}
 				var f4 = data.polys[f].vertices;
 				//all edges are convex so naively doing this is fine
 				for (var a=0, l=f4.length; a<l-1;a++) {
 					var p1 = 0;
 					var p2 = a;
 					var p3 = (a + 1) % l;
-					islandGeometry.faces.push(new THREE.Face3(f4[p3], f4[p2], f4[p1]));
+					var face = new THREE.Face3(f4[p3], f4[p2], f4[p1]);
+					switch(data.polys[f].land){
+					case 'land':
+						face.color.setRGB( 0.4, 0.7, 0.4 );
+						break;
+					case 'ocean':
+						face.color.setRGB( 0, 0, 0.7 );
+						break;
+					case 'forcedOcean':
+						face.color.setRGB( 0, 0, 0.6 );
+						break;
+					case 'lake':
+						face.color.setRGB( 0, 0.4, 0.8 );
+						break;
+					}
+					islandGeometry.faces.push(face);
 				}
 			}
 		})();
 		islandGeometry.computeCentroids();
 		islandGeometry.computeFaceNormals();
 		var material = new THREE.MeshLambertMaterial({
-				color:  0xFF00CC
+				color:  0xFFFFFF,
+				vertexColors: THREE.FaceColors
 			});
 		var islandObject = new THREE.Mesh(islandGeometry, material);
 		var island = new THREE.Object3D();
