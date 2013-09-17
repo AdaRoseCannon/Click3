@@ -15,14 +15,14 @@ Make sure you have the following installed:
 
 Then run:
 
-bower install
-npm install
-grunt build
+* bower install
+* npm install
+* grunt build
 
 to display it in your browser run:
 
-grunt server
+* grunt server
 
 to build for distribution run
 
-grunt build:dist
+* grunt build:dist
