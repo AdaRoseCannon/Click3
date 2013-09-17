@@ -397,6 +397,45 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 		})();
 
+		function seperateEdge(edgeNo) {
+			var edge = data.edges[edgeNo];
+			if(edge.polys.length === 1) {
+				return data.edges[edgeNo];
+			}
+
+			data.edges[edgeNo].polys.splice(1, 1);
+
+			var polygon1 = data.polys[edge.polys[0]];
+
+			//create new vertices.
+			var vertex1 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.a]))) -1;
+			var vertex2 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.b]))) -1;
+
+			var newEdge = data.edges.push({a: vertex1, b: vertex2, polys: [polygon1]}) - 1;
+
+			polygon1.vertices[polygon1.vertices.indexOf(edge.a)] = vertex1;
+			polygon1.vertices[polygon1.vertices.indexOf(edge.b)] = vertex2;
+
+			polygon1.edges[polygon1.edges.indexOf(edgeNo)] = newEdge;
+
+			return [edgeNo,newEdge];
+		}
+
+		function bridge(edgeNo1, edgeNo2) {
+
+			var e1 = data.edges[edgeNo1];
+			var e2 = data.edges[edgeNo2];
+
+			var newPoly = {};
+			newPoly.vertices = [e2.a, e2.b, e1.b, e1.a];
+			newPoly.edges = [edgeNo1, edgeNo2];
+
+			newPoly = data.polys.push(JSON.parse(JSON.stringify(newPoly))) -1;
+
+			return newPoly;
+
+		}
+
 		for (var k=0,l3=data.edges.length;k<l3;k++) {
 			if(data.edges[k].type !== undefined) {
 				switch (data.edges[k].type) {
@@ -405,8 +444,20 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 					data.vertices[data.edges[k].b].z = 0;
 					break;
 				case 'cliffs':
-					data.vertices[data.edges[k].a].z = 20;
-					data.vertices[data.edges[k].b].z = 20;
+					var e = seperateEdge(k);
+					if (data.polys[data.edges[e[0]].polys[0]].land === 'land') {
+						data.vertices[data.edges[e[1]].a].z = 20;
+						data.vertices[data.edges[e[1]].b].z = 20;
+						data.vertices[data.edges[e[0]].a].z = 0;
+						data.vertices[data.edges[e[0]].b].z = 0;
+					} else {
+						data.vertices[data.edges[e[0]].a].z = 20;
+						data.vertices[data.edges[e[0]].b].z = 20;
+						data.vertices[data.edges[e[1]].a].z = 0;
+						data.vertices[data.edges[e[1]].b].z = 0;
+					}
+					//fill in new gap
+					bridge(e[0], e[1]);
 					break;
 				}
 				ctx.stroke();
@@ -633,7 +684,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		islandGeometry.computeFaceNormals();
 		var material = new THREE.MeshLambertMaterial({
 				color:  0xFFFFFF,
-				vertexColors: THREE.FaceColors
+				vertexColors: THREE.FaceColors,
+				overdraw: true
 			});
 		var islandObject = new THREE.Mesh(islandGeometry, material);
 		var island = new THREE.Object3D();
