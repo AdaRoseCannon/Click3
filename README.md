@@ -15,8 +15,8 @@ Make sure you have the following installed:
 
 Then run:
 
-* bower install
 * npm install
+* bower install
 * grunt build
 
 to display it in your browser run:
