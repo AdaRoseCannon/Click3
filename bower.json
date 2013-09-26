@@ -6,7 +6,8 @@
     "jquery": "~1.9.1",
     "threejs": "*",
     "requirejs": "*",
-    "sass-bootstrap": "~3.0.0"
+    "sass-bootstrap": "~3.0.0",
+    "chroma-js": "~0.5.2"
   },
   "devDependencies": {}
 }

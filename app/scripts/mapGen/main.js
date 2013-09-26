@@ -1,5 +1,5 @@
 /* globals define, $, THREE*/
-define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton', 'three'], function ($, Voronoi, Perlin, AnimRequest, three) {
+define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/requestAnimSingleton', 'three', 'chroma'], function ($, Voronoi, Perlin, AnimRequest, three, chroma) {
 	'use strict';
 	var v = new Voronoi();
 	var perlin = new Perlin(true);
@@ -8,6 +8,147 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 	function pad(n, len) {
 		return (new Array(len + 1).join('0') + n).slice(-len);
 	}
+
+
+	function getPerlin(point, min, max, zoom) {
+		var x = point.x;
+		var y = point.y;
+		var z = point.z;
+		var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
+		if (noise < min) {
+			noise = min;
+		}
+		if (noise > max) {
+			noise = max;
+		}
+		noise = noise - min;
+		noise *= 1/(max - min);
+		return noise;
+	}
+
+	function relax (diagram, bbox) {
+		var points = [];
+		//relax by making the new point the average of the vertices.
+		for(var cell in diagram.cells) {
+			var px = 0, py = 0, n = 0;
+			for(var halfedge in diagram.cells[cell].halfedges) {
+				n++;
+				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
+				px += va.x;
+				py += va.y;
+			}
+			points[cell] = {x: px/n, y: py/n};
+		}
+		return v.compute(points, bbox);
+	}
+
+	function render (canvas, ctx, diagram) {
+		ctx.globalAlpha = 1;
+		ctx.beginPath();
+		ctx.rect(0,0,canvas.width,canvas.height);
+		ctx.fillStyle = 'white';
+		ctx.fill();
+		ctx.strokeStyle = '#888';
+		ctx.stroke();
+		// voronoi
+		if (!diagram) {return;}
+		// edges
+		ctx.beginPath();
+		ctx.strokeStyle = '#000';
+		var edges = diagram.edges,
+			iEdge = edges.length,
+			edge, vertex;
+		while (iEdge--) {
+			edge = edges[iEdge];
+			vertex = edge.va;
+			ctx.moveTo(vertex.x,vertex.y);
+			vertex = edge.vb;
+			ctx.lineTo(vertex.x,vertex.y);
+		}
+		ctx.stroke();
+		// sites
+		ctx.beginPath();
+		ctx.fillStyle = '#44f';
+		var iSite = diagram.cells.length;
+		while (iSite--) {
+			vertex = diagram.cells[iSite].site;
+			ctx.rect(vertex.x-2/3,vertex.y-2/3,2,2);
+		}
+		ctx.fill();
+	}
+
+	function renderCells (canvas, ctx, data, hasData) {
+
+		var cellKey = [];
+		for(var i=0,l=data.polys.length;i<l;i++) {
+			var key = pad(i.toString(16),6);
+			cellKey[i] = key;
+			if (hasData) {
+				switch (data.polys[i].land) {
+				case 'land':
+					key = '668855';
+					break;
+				case 'lake':
+					key = '00ffff';
+					break;
+				case 'ocean':
+					key = '000066';
+					break;
+				case 'forcedOcean':
+					key = '000055';
+					break;
+				default:
+					key = '000000';
+				}
+				//ctx.globalCompositeOperation='lighter';
+			}
+			ctx.fillStyle = '#' + key;
+			ctx.beginPath();
+			var v = null;
+			for (var j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
+				if (v === null) {
+					v = data.vertices[data.polys[i].vertices[j]];
+					ctx.moveTo(v.x, v.y);
+				} else {
+					v = data.vertices[data.polys[i].vertices[j]];
+					ctx.lineTo(v.x, v.y);
+				}
+			}
+			ctx.closePath();
+			ctx.fill();
+			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
+				v = data.vertices[data.polys[i].vertices[j]];
+				if (v.distanceToOcean) {
+					var newCol = '#' + pad((255-(v.distanceToOcean*64)).toString(16),2) + '0000';
+					ctx.fillStyle = newCol;
+					ctx.fillRect(v.x-3, v.y-3, 6,6);
+				}
+			}
+		}
+		for (var k=0,l3=data.edges.length;k<l3;k++) {
+			if(data.edges[k].type !== undefined) {
+				var v1 = data.vertices[data.edges[k].a];
+				var v2 = data.vertices[data.edges[k].b];
+				ctx.beginPath();
+				ctx.moveTo(v1.x, v1.y);
+				ctx.lineTo(v2.x, v2.y);
+				switch (data.edges[k].type) {
+				case 'beach':
+					ctx.lineWidth=5;
+					ctx.strokeStyle='#FFFF00';
+					break;
+				case 'cliffs':
+					ctx.lineWidth=4;
+					ctx.strokeStyle='#333333';
+					break;
+				}
+				ctx.stroke();
+			}
+		}
+		ctx.globalCompositeOperation='source-over';
+		return cellKey;
+	}
+
 	function setup () {
 		console.time('mapGen');
 		var wrapper = document.createElement('div');
@@ -400,23 +541,48 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		function seperateEdge(edgeNo) {
 			var edge = data.edges[edgeNo];
 			if(edge.polys.length === 1) {
+				console.log(1);
 				return data.edges[edgeNo];
 			}
 
-			data.edges[edgeNo].polys.splice(1, 1);
+			//remove one of the polygons from the edge.
+			//this is the polygone which remains unchanged
+			var polygon2 = data.polys[edge.polys.splice(1, 1)[0]];
 
+			//This is the polygon which remains attatched 
 			var polygon1 = data.polys[edge.polys[0]];
 
 			//create new vertices.
 			var vertex1 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.a]))) -1;
 			var vertex2 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.b]))) -1;
 
-			var newEdge = data.edges.push({a: vertex1, b: vertex2, polys: [polygon1]}) - 1;
+			//and create a new edge from those vertices.
+			var newEdge = data.edges.push({a: vertex1, b: vertex2, polys: [polygon1.index]}) - 1;
 
+			//update the polygon with the new vertices
 			polygon1.vertices[polygon1.vertices.indexOf(edge.a)] = vertex1;
 			polygon1.vertices[polygon1.vertices.indexOf(edge.b)] = vertex2;
 
+			//update the polygon with the new edge
 			polygon1.edges[polygon1.edges.indexOf(edgeNo)] = newEdge;
+
+
+			//Identify which polygons/edges get the new vertices and which get the old
+
+			for (var adj in polygon1.adjacent) {
+				var index = polygon1.adjacent[adj];
+				var p = data.polys[index];
+				if(index !== polygon2.index) {
+					var pa = p.vertices.indexOf(edge.a);
+					var pb = p.vertices.indexOf(edge.b);
+					if(pa !== -1) {
+						p.vertices[pa] = vertex1;
+					}
+					if(pb !== -1) {
+						p.vertices[pb] = vertex2;
+					}
+				}
+			}
 
 			return [edgeNo,newEdge];
 		}
@@ -427,9 +593,18 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			var e2 = data.edges[edgeNo2];
 
 			var newPoly = {};
-			newPoly.vertices = [e2.a, e2.b, e1.b, e1.a];
+			newPoly.vertices = [e2.a];
+			if (newPoly.vertices.indexOf(e2.b) === -1) {
+				newPoly.vertices.push(e2.b);
+			}
+			if (newPoly.vertices.indexOf(e1.b) === -1) {
+				newPoly.vertices.push(e1.b);
+			}
+			if (newPoly.vertices.indexOf(e1.a) === -1) {
+				newPoly.vertices.push(e1.a);
+			}
 			newPoly.edges = [edgeNo1, edgeNo2];
-
+			console.log(newPoly.vertices.length);
 			newPoly = data.polys.push(JSON.parse(JSON.stringify(newPoly))) -1;
 
 			return newPoly;
@@ -445,19 +620,21 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 					break;
 				case 'cliffs':
 					var e = seperateEdge(k);
-					if (data.polys[data.edges[e[0]].polys[0]].land === 'land') {
-						data.vertices[data.edges[e[1]].a].z = 20;
-						data.vertices[data.edges[e[1]].b].z = 20;
-						data.vertices[data.edges[e[0]].a].z = 0;
-						data.vertices[data.edges[e[0]].b].z = 0;
-					} else {
-						data.vertices[data.edges[e[0]].a].z = 20;
-						data.vertices[data.edges[e[0]].b].z = 20;
-						data.vertices[data.edges[e[1]].a].z = 0;
-						data.vertices[data.edges[e[1]].b].z = 0;
+					if (e.length > 1) {
+						if (data.polys[data.edges[e[1]].polys[0]].land === 'land') {
+							data.vertices[data.edges[e[1]].a].z = 20;
+							data.vertices[data.edges[e[1]].b].z = 20;
+							data.vertices[data.edges[e[0]].a].z = 0;
+							data.vertices[data.edges[e[0]].b].z = 0;
+						} else {
+							data.vertices[data.edges[e[0]].a].z = 20;
+							data.vertices[data.edges[e[0]].b].z = 20;
+							data.vertices[data.edges[e[1]].a].z = 0;
+							data.vertices[data.edges[e[1]].b].z = 0;
+						}
+						//fill in new gap
+						data.polys[bridge(e[0], e[1])].land = 'cliff';
 					}
-					//fill in new gap
-					bridge(e[0], e[1]);
 					break;
 				}
 				ctx.stroke();
@@ -468,146 +645,8 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		console.log(data);
 		renderCells(canvas, ctx, data, true);
 		console.timeEnd('mapGen');
+		canvas.style.display = 'none';
 		render3D(canvas, ctx, data);
-	}
-
-	function getPerlin(point, min, max, zoom) {
-		var x = point.x;
-		var y = point.y;
-		var z = point.z;
-		var noise = perlin.noise(x/(10 * zoom),y/(10 * zoom),z/(10 * zoom));
-		if (noise < min) {
-			noise = min;
-		}
-		if (noise > max) {
-			noise = max;
-		}
-		noise = noise - min;
-		noise *= 1/(max - min);
-		return noise;
-	}
-
-	function relax (diagram, bbox) {
-		var points = [];
-		//relax by making the new point the average of the vertices.
-		for(var cell in diagram.cells) {
-			var px = 0, py = 0, n = 0;
-			for(var halfedge in diagram.cells[cell].halfedges) {
-				n++;
-				var va = diagram.cells[cell].halfedges[halfedge].edge.va;
-				px += va.x;
-				py += va.y;
-			}
-			points[cell] = {x: px/n, y: py/n};
-		}
-		return v.compute(points, bbox);
-	}
-
-	function render (canvas, ctx, diagram) {
-		ctx.globalAlpha = 1;
-		ctx.beginPath();
-		ctx.rect(0,0,canvas.width,canvas.height);
-		ctx.fillStyle = 'white';
-		ctx.fill();
-		ctx.strokeStyle = '#888';
-		ctx.stroke();
-		// voronoi
-		if (!diagram) {return;}
-		// edges
-		ctx.beginPath();
-		ctx.strokeStyle = '#000';
-		var edges = diagram.edges,
-			iEdge = edges.length,
-			edge, vertex;
-		while (iEdge--) {
-			edge = edges[iEdge];
-			vertex = edge.va;
-			ctx.moveTo(vertex.x,vertex.y);
-			vertex = edge.vb;
-			ctx.lineTo(vertex.x,vertex.y);
-		}
-		ctx.stroke();
-		// sites
-		ctx.beginPath();
-		ctx.fillStyle = '#44f';
-		var iSite = diagram.cells.length;
-		while (iSite--) {
-			vertex = diagram.cells[iSite].site;
-			ctx.rect(vertex.x-2/3,vertex.y-2/3,2,2);
-		}
-		ctx.fill();
-	}
-
-	function renderCells (canvas, ctx, data, hasData) {
-
-		var cellKey = [];
-		for(var i=0,l=data.polys.length;i<l;i++) {
-			var key = pad(i.toString(16),6);
-			cellKey[i] = key;
-			if (hasData) {
-				switch (data.polys[i].land) {
-				case 'land':
-					key = '668855';
-					break;
-				case 'lake':
-					key = '00ffff';
-					break;
-				case 'ocean':
-					key = '000066';
-					break;
-				case 'forcedOcean':
-					key = '000055';
-					break;
-				default:
-					key = '000000';
-				}
-				//ctx.globalCompositeOperation='lighter';
-			}
-			ctx.fillStyle = '#' + key;
-			ctx.beginPath();
-			var v = null;
-			for (var j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
-				if (v === null) {
-					v = data.vertices[data.polys[i].vertices[j]];
-					ctx.moveTo(v.x, v.y);
-				} else {
-					v = data.vertices[data.polys[i].vertices[j]];
-					ctx.lineTo(v.x, v.y);
-				}
-			}
-			ctx.closePath();
-			ctx.fill();
-			for (j=0,l2=data.polys[i].vertices.length;j<l2;j++) {
-				v = data.vertices[data.polys[i].vertices[j]];
-				if (v.distanceToOcean) {
-					var newCol = '#' + pad((255-(v.distanceToOcean*64)).toString(16),2) + '0000';
-					ctx.fillStyle = newCol;
-					ctx.fillRect(v.x-3, v.y-3, 6,6);
-				}
-			}
-		}
-		for (var k=0,l3=data.edges.length;k<l3;k++) {
-			if(data.edges[k].type !== undefined) {
-				var v1 = data.vertices[data.edges[k].a];
-				var v2 = data.vertices[data.edges[k].b];
-				ctx.beginPath();
-				ctx.moveTo(v1.x, v1.y);
-				ctx.lineTo(v2.x, v2.y);
-				switch (data.edges[k].type) {
-				case 'beach':
-					ctx.lineWidth=5;
-					ctx.strokeStyle='#FFFF00';
-					break;
-				case 'cliffs':
-					ctx.lineWidth=4;
-					ctx.strokeStyle='#333333';
-					break;
-				}
-				ctx.stroke();
-			}
-		}
-		ctx.globalCompositeOperation='source-over';
-		return cellKey;
 	}
 
 	function render3D(canvas, ctx, data){
@@ -657,11 +696,19 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			for(var f in data.polys) {
 				var f4 = data.polys[f].vertices;
 				//all edges are convex so naively doing this is fine
+				var h = Math.random();
 				for (var a=0, l=f4.length; a<l-1;a++) {
 					var p1 = 0;
 					var p2 = a;
 					var p3 = (a + 1) % l;
-					var face = new THREE.Face3(f4[p3], f4[p2], f4[p1]);
+					var p4 = (a + 2) % l;
+					var face, face2;
+					if (p4 === 0 || true) {
+						face = new THREE.Face3(f4[p3], f4[p2], f4[p1]);
+						face2 = new THREE.Face3(f4[p2], f4[p3], f4[p1]);
+					} else {
+						face = new THREE.Face4(f4[p4], f4[p3], f4[p2], f4[p1]);
+					}
 					switch(data.polys[f].land){
 					case 'land':
 						face.color.setRGB( 0.4, 0.7, 0.4 );
@@ -675,17 +722,22 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 					case 'lake':
 						face.color.setRGB( 0, 0.4, 0.8 );
 						break;
+					case 'cliff':
+						face.color.setHSL(h , 1, 0.5);
+						break;
 					}
 					islandGeometry.faces.push(face);
+					//islandGeometry.faces.push(face2);
 				}
 			}
 		})();
 		islandGeometry.computeCentroids();
 		islandGeometry.computeFaceNormals();
-		var material = new THREE.MeshLambertMaterial({
+		islandGeometry.computeVertexNormals();
+		var material = new THREE.MeshPhongMaterial({ //replace basic with lambert.
 				color:  0xFFFFFF,
 				vertexColors: THREE.FaceColors,
-				overdraw: true
+				overdraw: false
 			});
 		var islandObject = new THREE.Mesh(islandGeometry, material);
 		var island = new THREE.Object3D();

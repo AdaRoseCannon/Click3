@@ -2,6 +2,7 @@ require.config({
 	paths: {
 		jquery: '../bower_components/jquery/jquery',
 		three: '../bower_components/threejs/build/three',
+		chroma: '../bower_components/chroma-js/chroma',
 		bootstrapAffix: '../bower_components/sass-bootstrap/js/bootstrap-affix.js',
 		bootstrapAlert: '../bower_components/sass-bootstrap/js/bootstrap-alert.js',
 		bootstrapButton: '../bower_components/sass-bootstrap/js/bootstrap-button.js',
