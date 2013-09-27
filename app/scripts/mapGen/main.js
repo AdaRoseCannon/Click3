@@ -9,6 +9,11 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		return (new Array(len + 1).join('0') + n).slice(-len);
 	}
 
+	var uniquePush = function (a, i) {
+		if(a.indexOf(i) === -1) {
+			a.push(i);
+		}
+	};
 
 	function getPerlin(point, min, max, zoom) {
 		var x = point.x;
@@ -184,8 +189,6 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 		//This function must seperate the new object from the old to allow garbage collection.
 
 		render (canvas, ctx, diagram);
-
-		var reverseVertexMap = [];
 
 		var data = {};
 		data.vertices = [];
@@ -538,55 +541,28 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 			}
 		})();
 
-		function seperateEdge(edgeNo) {
-			var edge = data.edges[edgeNo];
-			if(edge.polys.length === 1) {
-				console.log(1);
-				return data.edges[edgeNo];
+		function split(edges) {
+
+
+			//collect all the vertices 
+			var verts = [];
+			for (var e1 in edges) {
+				uniquePush(verts,data.edges[edges[e1]].a);
+				uniquePush(verts,data.edges[edges[e1]].b);
 			}
 
-			//remove one of the polygons from the edge.
-			//this is the polygone which remains unchanged
-			var polygon2 = data.polys[edge.polys.splice(1, 1)[0]];
-
-			//This is the polygon which remains attatched 
-			var polygon1 = data.polys[edge.polys[0]];
-
-			//create new vertices.
-			var vertex1 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.a]))) -1;
-			var vertex2 = data.vertices.push(JSON.parse(JSON.stringify(data.vertices[edge.b]))) -1;
-
-			//and create a new edge from those vertices.
-			var newEdge = data.edges.push({a: vertex1, b: vertex2, polys: [polygon1.index]}) - 1;
-
-			//update the polygon with the new vertices
-			polygon1.vertices[polygon1.vertices.indexOf(edge.a)] = vertex1;
-			polygon1.vertices[polygon1.vertices.indexOf(edge.b)] = vertex2;
-
-			//update the polygon with the new edge
-			polygon1.edges[polygon1.edges.indexOf(edgeNo)] = newEdge;
-
-
-			//Identify which polygons/edges get the new vertices and which get the old
-
-			for (var adj in polygon1.adjacent) {
-				var index = polygon1.adjacent[adj];
-				var p = data.polys[index];
-				if(index !== polygon2.index) {
-					var pa = p.vertices.indexOf(edge.a);
-					var pb = p.vertices.indexOf(edge.b);
-					if(pa !== -1) {
-						p.vertices[pa] = vertex1;
-					}
-					if(pb !== -1) {
-						p.vertices[pb] = vertex2;
-					}
+			//duplicate any edges which contain any of the vertices.
+			var touchedEdges = [];
+			for (var e2 in data.edges) {
+				if(verts.indexOf(data.edges[e2].a) !== -1 || verts.indexOf(data.edges[e2].b) !== -1) {
+					touchedEdges.push(parseInt(e2,10));
 				}
 			}
+			console.log(touchedEdges);
 
-			return [edgeNo,newEdge];
+			//return a concatenated list of all edges.
+			return edges;
 		}
-
 		function bridge(edgeNo1, edgeNo2) {
 
 			var e1 = data.edges[edgeNo1];
@@ -604,42 +580,24 @@ define(['jquery', 'mapGen/rhill-voronoi-core', 'mapGen/doob-perlin', 'libs/reque
 				newPoly.vertices.push(e1.a);
 			}
 			newPoly.edges = [edgeNo1, edgeNo2];
-			console.log(newPoly.vertices.length);
 			newPoly = data.polys.push(JSON.parse(JSON.stringify(newPoly))) -1;
 
 			return newPoly;
 
 		}
 
+		var splitEdges = [];
 		for (var k=0,l3=data.edges.length;k<l3;k++) {
-			if(data.edges[k].type !== undefined) {
-				switch (data.edges[k].type) {
-				case 'beach':
-					data.vertices[data.edges[k].a].z = 0;
-					data.vertices[data.edges[k].b].z = 0;
-					break;
-				case 'cliffs':
-					var e = seperateEdge(k);
-					if (e.length > 1) {
-						if (data.polys[data.edges[e[1]].polys[0]].land === 'land') {
-							data.vertices[data.edges[e[1]].a].z = 20;
-							data.vertices[data.edges[e[1]].b].z = 20;
-							data.vertices[data.edges[e[0]].a].z = 0;
-							data.vertices[data.edges[e[0]].b].z = 0;
-						} else {
-							data.vertices[data.edges[e[0]].a].z = 20;
-							data.vertices[data.edges[e[0]].b].z = 20;
-							data.vertices[data.edges[e[1]].a].z = 0;
-							data.vertices[data.edges[e[1]].b].z = 0;
-						}
-						//fill in new gap
-						data.polys[bridge(e[0], e[1])].land = 'cliff';
-					}
-					break;
-				}
-				ctx.stroke();
+			if(data.edges[k].type === 'cliffs') {
+				splitEdges.push(k);
 			}
 		}
+		var newEdges = split(splitEdges);
+		for (var k4=0,l4=newEdges.length;k4<l4;k4++) {
+			data.vertices[data.edges[newEdges[k4]].a].z = 30;
+			data.vertices[data.edges[newEdges[k4]].b].z = 30;
+		}
+
 
 		console.log(Math.ceil((JSON.stringify(data).length*2)/1000)+'kB');
 		console.log(data);
